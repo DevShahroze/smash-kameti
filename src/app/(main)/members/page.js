@@ -1,0 +1,185 @@
+"use client";
+
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api/client";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { AdminOnly } from "@/components/auth/admin-only";
+import { useAuth } from "@/components/providers/auth-provider";
+
+export default function MembersPage() {
+  const { isAdmin } = useAuth();
+  const queryClient = useQueryClient();
+  const { data: members = [], isLoading } = useQuery({
+    queryKey: ["members"],
+    queryFn: () => apiFetch("/api/members"),
+  });
+  const { data: guests = [] } = useQuery({
+    queryKey: ["guests"],
+    queryFn: () => apiFetch("/api/guests"),
+  });
+
+  const [fullName, setFullName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const createMutation = useMutation({
+    mutationFn: (body) =>
+      apiFetch("/api/members", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members"] });
+      setFullName("");
+      setNickname("");
+      setOpen(false);
+      toast.success("Member added");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const guestMutation = useMutation({
+    mutationFn: () =>
+      apiFetch("/api/guests", {
+        method: "POST",
+        body: JSON.stringify({ name: guestName }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["guests"] });
+      setGuestName("");
+      toast.success("Guest added");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, active }) =>
+      apiFetch(`/api/members/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ active }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-medium">Members</h1>
+        <AdminOnly>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger className={cn(buttonVariants({ size: "sm" }))}>
+            Add member
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add member</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-3">
+              <div className="space-y-2">
+                <Label>Full name</Label>
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Nickname</Label>
+                <Input value={nickname} onChange={(e) => setNickname(e.target.value)} />
+              </div>
+              <Button
+                onClick={() =>
+                  createMutation.mutate({ fullName, nickname, active: true })
+                }
+                disabled={!fullName.trim()}
+              >
+                Save
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        </AdminOnly>
+      </div>
+
+      {isLoading && <p className="text-muted-foreground">Loading…</p>}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Nickname</TableHead>
+            <TableHead>Status</TableHead>
+            {isAdmin ? <TableHead /> : null}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {members.map((m) => (
+            <TableRow key={m._id}>
+              <TableCell>{m.fullName}</TableCell>
+              <TableCell>{m.nickname || "—"}</TableCell>
+              <TableCell>{m.active ? "Active" : "Inactive"}</TableCell>
+              {isAdmin ? (
+                <TableCell className="text-right">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      toggleMutation.mutate({ id: m._id, active: !m.active })
+                    }
+                  >
+                    {m.active ? "Deactivate" : "Activate"}
+                  </Button>
+                </TableCell>
+              ) : null}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      <section className="space-y-3">
+        <h2 className="font-medium">Guests</h2>
+        <p className="text-sm text-muted-foreground">
+          Guests can join outings; assign them on the outing form.
+        </p>
+        <AdminOnly>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              className="max-w-xs"
+              placeholder="Guest name"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!guestName.trim()}
+              onClick={() => guestMutation.mutate()}
+            >
+              Add guest
+            </Button>
+          </div>
+        </AdminOnly>
+        {guests.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {guests.map((g) => g.name).join(", ")}
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
