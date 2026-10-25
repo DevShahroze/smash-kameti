@@ -10,6 +10,7 @@ import { Menu } from "lucide-react";
 import { AdminOnly } from "@/components/auth/admin-only";
 import { ActivityLogControls } from "@/components/logging/activity-log-controls";
 import { ConnectionStatus } from "@/components/layout/connection-status";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -92,6 +93,7 @@ export const TopNavbar = memo(function TopNavbar({
         </Link>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <ThemeToggle />
           <ConnectionStatus />
           <AdminOnly>
             <ActivityLogControls className="h-8 text-xs" />

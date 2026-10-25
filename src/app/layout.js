@@ -1,5 +1,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme/theme-provider";
+import { ThemeInitScript } from "@/components/theme/theme-init-script";
 
 const inter = Inter({
   variable: "--font-app-sans",
@@ -14,12 +16,19 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} dark h-full`}
+      suppressHydrationWarning
+    >
+      <head>
+        <ThemeInitScript />
+      </head>
       <body
         className="min-h-full flex flex-col bg-background text-sm leading-snug text-foreground antialiased"
         suppressHydrationWarning
       >
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
