@@ -22,15 +22,25 @@ import {
   listSettlementRows,
 } from "@/lib/services/settlement-rows";
 
+let resyncInFlight = null;
+
 /** Rebuild allocations and synced transactions from every completed outing. */
 export async function resyncSettlementsFromOutings() {
-  const outings = await Outing.find({
-    status: OUTING_STATUS.COMPLETED,
-  });
-  for (const outing of outings) {
-    await syncOutingFinancials(outing);
+  if (resyncInFlight) {
+    return resyncInFlight;
   }
-  return outings.length;
+  resyncInFlight = (async () => {
+    const outings = await Outing.find({
+      status: OUTING_STATUS.COMPLETED,
+    });
+    for (const outing of outings) {
+      await syncOutingFinancials(outing);
+    }
+    return outings.length;
+  })().finally(() => {
+    resyncInFlight = null;
+  });
+  return resyncInFlight;
 }
 
 /** Rebuild ledger rows for every bill linked to a Kameti rotation (after settled toggle). */

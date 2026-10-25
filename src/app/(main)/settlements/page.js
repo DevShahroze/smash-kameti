@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
-import { queryKeys } from "@/lib/api/query-config";
+import {
+  QUERY_STALE_SETTLEMENTS_MS,
+  queryKeys,
+} from "@/lib/api/query-config";
 import { SettlementTransferTable } from "@/components/settlements/settlement-transfer-table";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
@@ -14,6 +17,7 @@ export default function SettlementsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.settlements,
     queryFn: () => apiFetch("/api/settlements"),
+    staleTime: QUERY_STALE_SETTLEMENTS_MS,
   });
 
   const settleMutation = useMutation({
@@ -55,7 +59,7 @@ export default function SettlementsPage() {
       <SettlementTransferTable
         scope="kameti"
         title="Kameti settlement"
-        description="Kameti nights: shared bill split among present members; host payment counts. Parcels stay personal."
+        description="Kameti nights: treat split among members with Pays share checked on each bill; host payment counts. Parcels stay personal."
         transfers={kametiTransfers}
         showSettledCheckbox={isAdmin}
         onSettledChange={

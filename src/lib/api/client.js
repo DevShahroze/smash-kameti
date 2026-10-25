@@ -1,9 +1,5 @@
 import { logApiCall } from "@/lib/logging/activity-logger";
 import {
-  interceptApiGetEnd,
-  interceptApiGetStart,
-} from "@/lib/api/interceptor";
-import {
   isMutatingMethod,
   saveRequestEnd,
   saveRequestStart,
@@ -15,13 +11,9 @@ export async function apiFetch(path, options = {}) {
   let status = 0;
   let ok = false;
   let errorMessage = null;
-  const trackGet = method === "GET" && typeof window !== "undefined";
   const trackSave =
     typeof window !== "undefined" && isMutatingMethod(method);
 
-  if (trackGet) {
-    interceptApiGetStart(path);
-  }
   if (trackSave) {
     saveRequestStart();
   }
@@ -48,9 +40,6 @@ export async function apiFetch(path, options = {}) {
     }
     throw err;
   } finally {
-    if (trackGet) {
-      interceptApiGetEnd(path);
-    }
     if (trackSave) {
       saveRequestEnd();
     }
