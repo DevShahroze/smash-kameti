@@ -2,9 +2,10 @@ import { connectDB } from "@/lib/db/connect";
 import { jsonOk, jsonError, parseBody } from "@/lib/api/http";
 import { rotationPatchSchema } from "@/lib/validation/schemas";
 import KametiRotation from "@/models/KametiRotation";
+import KametiTurn from "@/models/KametiTurn";
 import { resyncOutingsForKametiRotation } from "@/lib/services/ledger";
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
@@ -12,7 +13,15 @@ export async function GET(_request, { params }) {
     if (!rotation) {
       return jsonError("Rotation not found", 404);
     }
-    return jsonOk(rotation);
+    const withTurns =
+      request.nextUrl.searchParams.get("include") === "turns";
+    if (!withTurns) {
+      return jsonOk(rotation);
+    }
+    const turns = await KametiTurn.find({ rotationId: id })
+      .sort({ turnNumber: 1 })
+      .lean();
+    return jsonOk({ rotation, turns });
   } catch (err) {
     console.error(err);
     return jsonError("Failed to load rotation", 500);

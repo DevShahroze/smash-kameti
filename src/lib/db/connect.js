@@ -20,8 +20,10 @@ export async function connectDB() {
   }
 
   if (!cached.promise) {
+    const dbName = process.env.MONGODB_DB_NAME || "smash-kameti";
     cached.promise = mongoose.connect(getMongoUri(), {
       bufferCommands: false,
+      dbName,
     });
   }
 

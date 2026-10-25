@@ -16,8 +16,10 @@ import { rotationTitle } from "@/lib/kameti-display";
 import { cn } from "@/lib/utils";
 import { SettlementsSummary } from "@/components/settlements/settlements-summary";
 import { AdminOnly } from "@/components/auth/admin-only";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export default function KametiListPage() {
+  const { isAdmin } = useAuth();
   const { data: rotations = [], isLoading } = useQuery({
     queryKey: ["kameti-rotations"],
     queryFn: () => apiFetch("/api/kameti/rotations"),
@@ -47,12 +49,14 @@ export default function KametiListPage() {
       ) : rotations.length === 0 ? (
         <div className="rounded-lg border p-6 text-center text-sm">
           <p className="text-muted-foreground">No Kameti saved yet.</p>
-          <Link
-            href="/kameti/new"
-            className={cn(buttonVariants({ size: "sm" }), "mt-3 inline-flex")}
-          >
-            Add your first Kameti
-          </Link>
+          {isAdmin ? (
+            <Link
+              href="/kameti/new"
+              className={cn(buttonVariants({ size: "sm" }), "mt-3 inline-flex")}
+            >
+              Add your first Kameti
+            </Link>
+          ) : null}
         </div>
       ) : (
         <Table className="text-sm [&_td]:py-2 [&_th]:h-9">

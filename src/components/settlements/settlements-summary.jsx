@@ -18,6 +18,7 @@ export function SettlementsSummary({
   const { data, isLoading, error } = useQuery({
     queryKey: ["settlements"],
     queryFn: () => apiFetch("/api/settlements"),
+    staleTime: 120_000,
   });
 
   if (isLoading) {

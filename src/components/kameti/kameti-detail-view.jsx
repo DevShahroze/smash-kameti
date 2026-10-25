@@ -30,17 +30,15 @@ export function KametiDetailView({ rotationId }) {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: rotation, isLoading: rotationLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["kameti-rotation", rotationId],
-    queryFn: () => apiFetch(`/api/kameti/rotations/${rotationId}`),
-  });
-
-  const { data: turns = [], isLoading: turnsLoading } = useQuery({
-    queryKey: ["kameti-turns", rotationId],
     queryFn: () =>
-      apiFetch(`/api/kameti/turns?rotationId=${rotationId}`),
-    enabled: Boolean(rotationId),
+      apiFetch(
+        `/api/kameti/rotations/${rotationId}?include=turns`,
+      ),
   });
+  const rotation = data?.rotation ?? (data && !data.turns ? data : null);
+  const turns = data?.turns ?? [];
 
   const patchRotation = useMutation({
     mutationFn: (body) =>
@@ -64,14 +62,16 @@ export function KametiDetailView({ rotationId }) {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["kameti-turns", rotationId] });
+      queryClient.invalidateQueries({
+        queryKey: ["kameti-rotation", rotationId],
+      });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["settlements"] });
     },
     onError: (e) => toast.error(e.message),
   });
 
-  if (rotationLoading) {
+  if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
@@ -88,7 +88,14 @@ export function KametiDetailView({ rotationId }) {
 
   const pending = turns.filter((t) => t.status === "pending");
   const completedTurns = turns.filter((t) => t.status === "completed");
-  const isLoading = turnsLoading;
+  const totalTreatPaisa = turns.reduce(
+    (sum, t) => sum + (t.treatAmountPaisa || 0),
+    0,
+  );
+  const completedTreatPaisa = completedTurns.reduce(
+    (sum, t) => sum + (t.treatAmountPaisa || 0),
+    0,
+  );
 
   return (
     <div className="space-y-4">
@@ -150,12 +157,40 @@ export function KametiDetailView({ rotationId }) {
         </p>
       </div>
 
+      <section className="grid gap-2 rounded-lg border bg-muted/20 p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <p className="text-muted-foreground">Turns</p>
+          <p className="font-medium tabular-nums">
+            {completedTurns.length}/{turns.length} done
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Treat total (all turns)</p>
+          <p className="font-medium">
+            <Money paisa={totalTreatPaisa} />
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Recorded on completed turns</p>
+          <p className="font-medium">
+            <Money paisa={completedTreatPaisa} />
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Current turn</p>
+          <p className="font-medium">
+            {pending[0]
+              ? `Week ${pending[0].turnNumber} · ${pending[0].memberNameSnapshot}`
+              : turns.length
+                ? "Rotation complete"
+                : "—"}
+          </p>
+        </div>
+      </section>
+
       <SettlementsSummary compact />
 
-      {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading turns…</p>
-      ) : (
-        <>
+      <>
           {pending[0] ? (
             <div className="rounded-lg border border-primary/25 bg-muted/30 px-3 py-2 text-sm">
               <span className="text-muted-foreground">Current turn: </span>
@@ -324,8 +359,7 @@ export function KametiDetailView({ rotationId }) {
           {rotation.notes ? (
             <p className="text-xs text-muted-foreground">{rotation.notes}</p>
           ) : null}
-        </>
-      )}
+      </>
     </div>
   );
 }

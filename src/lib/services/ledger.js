@@ -102,8 +102,11 @@ async function buildSettlementContext() {
   };
 }
 
-export async function getSettlementLedger() {
-  await resyncSettlementsFromOutings();
+export async function getSettlementLedger(options = {}) {
+  const { resync = false } = options;
+  if (resync) {
+    await resyncSettlementsFromOutings();
+  }
 
   const settlementContext = await buildSettlementContext();
 
