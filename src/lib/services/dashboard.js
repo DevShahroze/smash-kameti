@@ -59,7 +59,10 @@ export async function getDashboardData() {
   });
 
   const upcoming = await Outing.find({
-    status: { $in: [OUTING_STATUS.PLANNED, OUTING_STATUS.POSTPONED] },
+    $or: [
+      { status: OUTING_STATUS.PLANNED },
+      { status: OUTING_STATUS.POSTPONED },
+    ],
   })
     .sort({ scheduledDate: 1 })
     .limit(5)

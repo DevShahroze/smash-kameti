@@ -1,11 +1,15 @@
 import { connectDB } from "@/lib/db/connect";
 import { jsonOk, jsonError } from "@/lib/api/http";
 import Transaction from "@/models/Transaction";
+import {
+  isInvalidParamError,
+  resolveRouteObjectId,
+} from "@/lib/security/route-id";
 
 export async function DELETE(_request, { params }) {
   try {
     await connectDB();
-    const { id } = await params;
+    const id = await resolveRouteObjectId(params);
     const tx = await Transaction.findById(id);
     if (!tx) {
       return jsonError("Transaction not found", 404);
@@ -19,6 +23,9 @@ export async function DELETE(_request, { params }) {
     await tx.deleteOne();
     return jsonOk({ deleted: true });
   } catch (err) {
+    if (isInvalidParamError(err)) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Failed to delete transaction", 500);
   }

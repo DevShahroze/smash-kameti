@@ -1,5 +1,9 @@
 import mongoose from "mongoose";
 
+// User-facing filters are validated in API routes; global sanitizeFilter breaks
+// legitimate $in/$ne queries by wrapping them in $eq.
+mongoose.set("sanitizeFilter", false);
+
 function getMongoUri() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {

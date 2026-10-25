@@ -1,22 +1,30 @@
 import { connectDB } from "@/lib/db/connect";
 import { jsonOk, jsonError } from "@/lib/api/http";
+import { TRANSACTION_TYPES } from "@/lib/constants";
 import Transaction from "@/models/Transaction";
 import Outing from "@/models/Outing";
+import { parseEnumParam, parseObjectId } from "@/lib/security/sanitize";
 
 export async function GET(request) {
   try {
     await connectDB();
     const { searchParams } = new URL(request.url);
     const filter = {};
-    if (searchParams.get("type")) {
-      filter.type = searchParams.get("type");
+    const type = parseEnumParam(
+      searchParams.get("type"),
+      Object.values(TRANSACTION_TYPES),
+      "type",
+    );
+    if (type) {
+      filter.type = type;
     }
-    if (searchParams.get("memberId")) {
-      const memberId = searchParams.get("memberId");
+    const memberId = parseObjectId(searchParams.get("memberId"), "memberId");
+    if (memberId) {
       filter.$or = [{ payerId: memberId }, { recipientId: memberId }];
     }
-    if (searchParams.get("outingId")) {
-      filter.outingId = searchParams.get("outingId");
+    const outingId = parseObjectId(searchParams.get("outingId"), "outingId");
+    if (outingId) {
+      filter.outingId = outingId;
     }
 
     const transactions = await Transaction.find(filter)
@@ -49,6 +57,9 @@ export async function GET(request) {
 
     return jsonOk(enriched);
   } catch (err) {
+    if (err?.message?.startsWith("Invalid ")) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Failed to load transactions", 500);
   }

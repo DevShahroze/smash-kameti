@@ -5,17 +5,24 @@ import KametiTurn from "@/models/KametiTurn";
 import Member from "@/models/Member";
 import AuditLog from "@/models/AuditLog";
 import { TURN_STATUS } from "@/lib/constants";
+import {
+  isInvalidParamError,
+  resolveRouteObjectId,
+} from "@/lib/security/route-id";
 
 export async function GET(_request, { params }) {
   try {
     await connectDB();
-    const { id } = await params;
+    const id = await resolveRouteObjectId(params);
     const turn = await KametiTurn.findById(id).lean();
     if (!turn) {
       return jsonError("Turn not found", 404);
     }
     return jsonOk(turn);
   } catch (err) {
+    if (isInvalidParamError(err)) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Failed to load turn", 500);
   }
@@ -24,7 +31,7 @@ export async function GET(_request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     await connectDB();
-    const { id } = await params;
+    const id = await resolveRouteObjectId(params);
     const body = await parseBody(request);
     const parsed = turnUpdateSchema.safeParse(body);
     if (!parsed.success) {
@@ -82,6 +89,9 @@ export async function PATCH(request, { params }) {
 
     return jsonOk(turn);
   } catch (err) {
+    if (isInvalidParamError(err)) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Failed to update turn", 500);
   }

@@ -1,5 +1,8 @@
 import { connectDB } from "@/lib/db/connect";
 import { jsonError } from "@/lib/api/http";
+import { requireAdminApi } from "@/lib/auth/require-admin-api";
+import { withSecurityHeaders } from "@/lib/security/headers";
+import { parseEnumParam } from "@/lib/security/sanitize";
 import Outing from "@/models/Outing";
 import Transaction from "@/models/Transaction";
 import ExpenseAllocation from "@/models/ExpenseAllocation";
@@ -26,11 +29,19 @@ function toCsv(rows) {
   return lines.join("\n");
 }
 
+const EXPORT_TYPES = ["outings", "transactions", "allocations", "settlements"];
+
 export async function GET(request) {
+  const denied = await requireAdminApi();
+  if (denied) {
+    return denied;
+  }
   try {
     await connectDB();
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type") || "outings";
+    const type =
+      parseEnumParam(searchParams.get("type") || "outings", EXPORT_TYPES, "type") ||
+      "outings";
 
     let csv = "";
     let filename = "export.csv";
@@ -94,12 +105,15 @@ export async function GET(request) {
     }
 
     return new Response(csv, {
-      headers: {
+      headers: withSecurityHeaders({
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}"`,
-      },
+      }),
     });
   } catch (err) {
+    if (err?.message?.startsWith("Invalid ")) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Export failed", 500);
   }

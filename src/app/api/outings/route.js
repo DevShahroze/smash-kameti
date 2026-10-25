@@ -1,28 +1,49 @@
 import { connectDB } from "@/lib/db/connect";
 import { jsonOk, jsonError, parseBody } from "@/lib/api/http";
 import { outingSchema } from "@/lib/validation/schemas";
+import { OUTING_STATUS, PAYMENT_SYSTEMS } from "@/lib/constants";
 import Outing from "@/models/Outing";
 import { createOuting } from "@/lib/services/outing-service";
+import {
+  parseEnumParam,
+  parseObjectId,
+  parsePositiveIntParam,
+} from "@/lib/security/sanitize";
 
 export async function GET(request) {
   try {
     await connectDB();
     const { searchParams } = new URL(request.url);
     const filter = {};
-    if (searchParams.get("weekNumber")) {
-      filter.weekNumber = Number(searchParams.get("weekNumber"));
+    const weekNumber = parsePositiveIntParam(
+      searchParams.get("weekNumber"),
+      "weekNumber",
+    );
+    if (weekNumber) {
+      filter.weekNumber = weekNumber;
     }
-    if (searchParams.get("paymentSystem")) {
-      filter.paymentSystem = searchParams.get("paymentSystem");
+    const paymentSystem = parseEnumParam(
+      searchParams.get("paymentSystem"),
+      [PAYMENT_SYSTEMS.KAMETI, PAYMENT_SYSTEMS.AMERICAN],
+      "paymentSystem",
+    );
+    if (paymentSystem) {
+      filter.paymentSystem = paymentSystem;
     }
-    if (searchParams.get("status")) {
-      filter.status = searchParams.get("status");
+    const status = parseEnumParam(
+      searchParams.get("status"),
+      Object.values(OUTING_STATUS),
+      "status",
+    );
+    if (status) {
+      filter.status = status;
     }
-    if (searchParams.get("venueId")) {
-      filter.venueId = searchParams.get("venueId");
+    const venueId = parseObjectId(searchParams.get("venueId"), "venueId");
+    if (venueId) {
+      filter.venueId = venueId;
     }
-    if (searchParams.get("memberId")) {
-      const memberId = searchParams.get("memberId");
+    const memberId = parseObjectId(searchParams.get("memberId"), "memberId");
+    if (memberId) {
       filter.$or = [
         { hostMemberId: memberId },
         { "attendance.memberId": memberId },
@@ -35,6 +56,9 @@ export async function GET(request) {
       .lean();
     return jsonOk(outings);
   } catch (err) {
+    if (err?.message?.startsWith("Invalid ")) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Failed to load outings", 500);
   }

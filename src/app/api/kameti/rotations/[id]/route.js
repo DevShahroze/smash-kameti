@@ -4,17 +4,26 @@ import { rotationPatchSchema } from "@/lib/validation/schemas";
 import KametiRotation from "@/models/KametiRotation";
 import KametiTurn from "@/models/KametiTurn";
 import { resyncOutingsForKametiRotation } from "@/lib/services/ledger";
+import {
+  isInvalidParamError,
+  resolveRouteObjectId,
+} from "@/lib/security/route-id";
+import { parseEnumParam } from "@/lib/security/sanitize";
 
 export async function GET(request, { params }) {
   try {
     await connectDB();
-    const { id } = await params;
+    const id = await resolveRouteObjectId(params);
     const rotation = await KametiRotation.findById(id).lean();
     if (!rotation) {
       return jsonError("Rotation not found", 404);
     }
     const withTurns =
-      request.nextUrl.searchParams.get("include") === "turns";
+      parseEnumParam(
+        request.nextUrl.searchParams.get("include"),
+        ["turns"],
+        "include",
+      ) === "turns";
     if (!withTurns) {
       return jsonOk(rotation);
     }
@@ -23,6 +32,9 @@ export async function GET(request, { params }) {
       .lean();
     return jsonOk({ rotation, turns });
   } catch (err) {
+    if (isInvalidParamError(err)) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Failed to load rotation", 500);
   }
@@ -31,7 +43,7 @@ export async function GET(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     await connectDB();
-    const { id } = await params;
+    const id = await resolveRouteObjectId(params);
     const body = await parseBody(request);
     const parsed = rotationPatchSchema.safeParse(body ?? {});
     if (!parsed.success) {
@@ -66,6 +78,9 @@ export async function PATCH(request, { params }) {
 
     return jsonOk(rotation);
   } catch (err) {
+    if (isInvalidParamError(err)) {
+      return jsonError(err.message, 400);
+    }
     console.error(err);
     return jsonError("Failed to update rotation", 500);
   }
