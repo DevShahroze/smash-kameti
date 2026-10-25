@@ -1,4 +1,9 @@
-import { TRANSACTION_TYPES, PAYMENT_SYSTEMS, PARTICIPANT_KIND } from "@/lib/constants";
+import {
+  TRANSACTION_TYPES,
+  PAYMENT_SYSTEMS,
+  PARTICIPANT_KIND,
+  ALLOCATION_TYPES,
+} from "@/lib/constants";
 import { computeBalances, balancesToArray } from "@/lib/accounting/balances";
 import { recommendTransfers } from "@/lib/accounting/settlement";
 
@@ -34,6 +39,36 @@ function outingIncludedInSettlements(outingId, settlementContext) {
   return true;
 }
 
+function isParcelAllocation(alloc) {
+  return alloc.allocationType === ALLOCATION_TYPES.AMERICAN_PARCEL;
+}
+
+/** Outing-sync parcel payments (Kameti nights) are tagged in notes. */
+export function isParcelOutingSyncTransaction(tx) {
+  return tx.notes === "Parcel payment";
+}
+
+/** Host already credited via full bill in overall; parcel tx is American-scope only. */
+function isKametiHostParcelPaymentExcludedFromOverall(tx, settlementContext) {
+  if (!isParcelOutingSyncTransaction(tx) || !tx.outingId) {
+    return false;
+  }
+  const system = paymentSystemForOuting(
+    tx.outingId,
+    settlementContext.outingPaymentById,
+  );
+  if (system !== PAYMENT_SYSTEMS.KAMETI) {
+    return false;
+  }
+  const hostId = settlementContext.outingHostByOutingId?.get(String(tx.outingId));
+  if (!hostId) {
+    return false;
+  }
+  return (
+    tx.payerKind === PARTICIPANT_KIND.MEMBER && String(tx.payerId) === hostId
+  );
+}
+
 export function filterAllocationsForScope(allocations, scope, settlementContext) {
   return allocations.filter((a) => {
     const system = paymentSystemForOuting(
@@ -42,6 +77,12 @@ export function filterAllocationsForScope(allocations, scope, settlementContext)
     );
     if (!outingIncludedInSettlements(a.outingId, settlementContext)) {
       return false;
+    }
+    if (isParcelAllocation(a)) {
+      return (
+        scope === SETTLEMENT_SCOPE.AMERICAN ||
+        scope === SETTLEMENT_SCOPE.OVERALL
+      );
     }
     if (scope === SETTLEMENT_SCOPE.AMERICAN) {
       return system === PAYMENT_SYSTEMS.AMERICAN;
@@ -70,10 +111,21 @@ export function filterTransactionsForScope(transactions, scope, settlementContex
         settlementContext.outingPaymentById,
       );
       if (scope === SETTLEMENT_SCOPE.AMERICAN) {
-        return system === PAYMENT_SYSTEMS.AMERICAN;
+        if (system === PAYMENT_SYSTEMS.AMERICAN) {
+          return true;
+        }
+        return (
+          system === PAYMENT_SYSTEMS.KAMETI && isParcelOutingSyncTransaction(t)
+        );
       }
       if (scope === SETTLEMENT_SCOPE.KAMETI) {
-        return system === PAYMENT_SYSTEMS.KAMETI;
+        if (system !== PAYMENT_SYSTEMS.KAMETI) {
+          return false;
+        }
+        return !isParcelOutingSyncTransaction(t);
+      }
+      if (isKametiHostParcelPaymentExcludedFromOverall(t, settlementContext)) {
+        return false;
       }
       return true;
     }

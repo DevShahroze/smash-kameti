@@ -28,6 +28,8 @@ const KametiTurnSchema = new mongoose.Schema(
     },
     completedAt: { type: Date, default: null },
     treatAmountPaisa: { type: Number, default: 0 },
+    /** Shared bill (Kameti split), excluding parcels. */
+    totalBillPaisa: { type: Number, default: 0 },
     notes: { type: String, default: "" },
   },
   { timestamps: true },

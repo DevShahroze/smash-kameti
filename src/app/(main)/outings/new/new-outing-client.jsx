@@ -29,6 +29,7 @@ export default function NewOutingClient() {
       undefined,
     kametiTurnId: searchParams.get("kametiTurnId") || undefined,
     hostMemberId: searchParams.get("hostMemberId") || undefined,
+    hostMemberName: searchParams.get("hostMemberName") || undefined,
     weekNumber: searchParams.get("weekNumber") || undefined,
     actualDate: searchParams.get("actualDate") || undefined,
     status: searchParams.get("status") || undefined,

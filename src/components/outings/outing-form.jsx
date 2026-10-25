@@ -4,8 +4,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
-import { queryKeys } from "@/lib/api/query-config";
-import { paisaFromRupees, rupeesFromPaisa } from "@/lib/money";
+import {
+  invalidateOutingFinancials,
+  queryKeys,
+} from "@/lib/api/query-config";
+import {
+  paisaFromRupees,
+  rupeesFromPaisa,
+  participantKey,
+} from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -129,6 +136,7 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     () => prefill?.hostMemberId || "",
   );
   const [attendance, setAttendance] = useState({});
+  const [kametiPaysShare, setKametiPaysShare] = useState({});
   const [chargeable, setChargeable] = useState({});
   const [outingGuests, setOutingGuests] = useState([]);
   const [parcels, setParcels] = useState([]);
@@ -136,6 +144,11 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     () => prefill?.hostMemberId || "",
   );
   const [guestPickerKey, setGuestPickerKey] = useState(0);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const isKametiOuting = paymentSystem === "kameti";
   const isAmericanOuting = paymentSystem === "american";
@@ -230,12 +243,8 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     [activeMembers, hostMemberId],
   );
 
-  const kametiRotationLabel = activeRotation
-    ? activeRotation.label ||
-      `Kameti ${new Date(activeRotation.createdAt).toLocaleDateString()}`
-    : "";
-
   const prefillApplied = useRef(false);
+  const turnBillPrefilledFor = useRef("");
 
   useEffect(() => {
     if (initialOuting || !prefill || prefillApplied.current) {
@@ -266,16 +275,26 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
   }, [initialOuting, prefill]);
 
   useEffect(() => {
-    if (paymentSystem !== "kameti" || !kametiTurnId) {
+    if (initialOuting || paymentSystem !== "kameti" || !kametiTurnId) {
       return;
     }
-    const turn = turns.find((t) => String(t._id) === String(kametiTurnId));
-    if (turn?.memberId) {
-      const hostId = String(turn.memberId);
+    const turn = linkedKametiTurn;
+    if (!turn) {
+      return;
+    }
+    const hostId = String(turn.memberId?._id ?? turn.memberId ?? "");
+    if (hostId) {
       setHostMemberId(hostId);
       setPayerMemberId(hostId);
     }
-  }, [paymentSystem, kametiTurnId, turns]);
+    const turnKey = String(kametiTurnId);
+    const billTotal =
+      turn.totalBillPaisa || turn.treatAmountPaisa || 0;
+    if (turnKey !== turnBillPrefilledFor.current && billTotal > 0) {
+      turnBillPrefilledFor.current = turnKey;
+      setSharedBill(String(rupeesFromPaisa(billTotal)));
+    }
+  }, [initialOuting, paymentSystem, kametiTurnId, linkedKametiTurn]);
 
   useEffect(() => {
     if (!initialOuting) {
@@ -299,8 +318,21 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
       initialOuting.hostMemberId ? String(initialOuting.hostMemberId) : "",
     );
     const att = {};
+    const pays = {};
     for (const row of initialOuting.attendance || []) {
-      att[String(row.memberId)] = row.status;
+      const id = String(row.memberId);
+      att[id] = row.status;
+      if (initialOuting.paymentSystem === "kameti") {
+        pays[id] =
+          row.paysShare === false
+            ? false
+            : row.paysShare === true
+              ? true
+              : row.status === "present";
+      }
+    }
+    if (initialOuting.paymentSystem === "kameti") {
+      setKametiPaysShare(pays);
     }
     setAttendance(att);
     const ch = {};
@@ -365,7 +397,10 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     (s, p) => s + (p.amount ? paisaFromRupees(p.amount) : 0),
     0,
   );
-  const grandTotalPaisa = sharedBillPaisa + parcelTotalPaisa;
+  const kametiSplitPaisa = Math.max(0, sharedBillPaisa - parcelTotalPaisa);
+  const grandTotalPaisa = isKametiOuting
+    ? sharedBillPaisa
+    : sharedBillPaisa + parcelTotalPaisa;
 
   const chargeableList = useMemo(() => {
     const list = [];
@@ -404,15 +439,20 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["outings"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["settlements"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      if (isEdit && initialOuting?._id) {
-        queryClient.invalidateQueries({
-          queryKey: ["outing", String(initialOuting._id)],
-        });
-      }
+      const turnId = fixedKametiTurnId ? String(fixedKametiTurnId) : undefined;
+      const rotationId = kametiTurnById?.rotationId
+        ? String(kametiTurnById.rotationId)
+        : activeRotation?._id
+          ? String(activeRotation._id)
+          : undefined;
+      void invalidateOutingFinancials(queryClient, {
+        outingId:
+          isEdit && initialOuting?._id
+            ? String(initialOuting._id)
+            : undefined,
+        rotationId,
+        turnId,
+      });
       toast.success(isEdit ? "Outing updated" : "Outing created");
       router.push("/outings");
     },
@@ -423,11 +463,19 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     mutationFn: () =>
       apiFetch(`/api/outings/${initialOuting._id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["outings"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["settlements"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["kameti"] });
+      const turnId = fixedKametiTurnId ? String(fixedKametiTurnId) : undefined;
+      const rotationId = kametiTurnById?.rotationId
+        ? String(kametiTurnById.rotationId)
+        : activeRotation?._id
+          ? String(activeRotation._id)
+          : undefined;
+      void invalidateOutingFinancials(queryClient, {
+        rotationId,
+        turnId,
+        outingId: initialOuting?._id
+          ? String(initialOuting._id)
+          : undefined,
+      });
       toast.success("Outing deleted");
       router.push("/outings");
     },
@@ -469,7 +517,7 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     }
     for (const parcel of parcels) {
       const amountPaisa = paisaFromRupees(parcel.amount);
-      if (amountPaisa <= 0) {
+      if (amountPaisa <= 0 || !parcel.paidById) {
         continue;
       }
       payments.push({
@@ -489,7 +537,7 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     const payments = [];
     for (const parcel of parcels) {
       const amountPaisa = paisaFromRupees(parcel.amount);
-      if (amountPaisa <= 0) {
+      if (amountPaisa <= 0 || !parcel.paidById) {
         continue;
       }
       payments.push({
@@ -516,6 +564,13 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     if (isKametiOuting && !kametiTurnId && !isEdit) {
       toast.error("Open Kameti and use Bill on a turn to record a treat.");
       return;
+    }
+    for (const p of parcels) {
+      const amountPaisa = paisaFromRupees(p.amount);
+      if (amountPaisa > 0 && (!p.paidById || !p.orderedById)) {
+        toast.error("Each parcel needs who ordered, who paid, and an amount.");
+        return;
+      }
     }
     const venueInfo = await ensureVenue();
     const hostMember = activeMembers.find((m) => m._id === hostMemberId);
@@ -546,6 +601,7 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
         memberId: m._id,
         memberNameSnapshot: memberLabel(m),
         status: attendance[m._id] || "present",
+        paysShare: isKametiOuting ? kametiPaysShare[m._id] !== false : true,
       })),
       guests: outingGuests,
       chargeableParticipants: isAmericanOuting ? chargeableList : [],
@@ -588,22 +644,37 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     ]);
   }
 
-  function addParcel() {
-    const first = activeMembers[0];
-    if (!first) {
-      return;
+  function defaultKametiParcelPayer() {
+    if (!isKametiOuting || !hostMemberId) {
+      return { paidByKind: "", paidById: "", paidByName: "" };
     }
+    const id = String(hostMemberId);
+    const host = activeMembers.find((m) => String(m._id) === id);
+    const name =
+      (host ? memberLabel(host) : "") ||
+      linkedKametiTurn?.memberNameSnapshot ||
+      prefill?.hostMemberName ||
+      "";
+    return {
+      paidByKind: "member",
+      paidById: id,
+      paidByName: name,
+    };
+  }
+
+  function addParcel() {
+    const payer = defaultKametiParcelPayer();
     setParcels((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
-        orderedByKind: "member",
-        orderedById: String(first._id),
-        orderedByName: memberLabel(first),
+        orderedByKind: "",
+        orderedById: "",
+        orderedByName: "",
         amount: "",
-        paidByKind: "member",
-        paidById: String(first._id),
-        paidByName: memberLabel(first),
+        paidByKind: payer.paidByKind,
+        paidById: payer.paidById,
+        paidByName: payer.paidByName,
         notes: "",
       },
     ]);
@@ -614,16 +685,16 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
       {isKametiTreatBill && (
         <div className="rounded-lg border bg-muted/30 px-3 py-2">
           <p className="text-sm font-medium">
-            {kametiRotationLabel || "Kameti"}
+            Kameti
             {weekNumber ? ` · Week ${weekNumber}` : ""}
           </p>
           <p className="text-xs text-muted-foreground">
             Host:{" "}
-            {linkedHost
-              ? memberLabel(linkedHost)
-              : linkedKametiTurn?.memberNameSnapshot || "—"}
-            {linkedKametiTurn
-              ? ` · Turn #${linkedKametiTurn.turnNumber}`
+            {prefill?.hostMemberName ||
+              linkedKametiTurn?.memberNameSnapshot ||
+              "—"}
+            {prefill?.weekNumber || linkedKametiTurn?.turnNumber
+              ? ` · Turn #${prefill?.weekNumber || linkedKametiTurn?.turnNumber}`
               : ""}
           </p>
         </div>
@@ -737,27 +808,47 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
         <section className="space-y-2 rounded-lg border p-3">
           <h2 className="text-sm font-medium">Attendance & guests</h2>
           <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              {activeMembers.map((m) => (
-                <div
-                  key={m._id}
-                  className="flex min-w-0 items-center justify-between gap-1 rounded-md border px-2 py-1"
-                >
-                  <span className="truncate text-xs font-medium">
-                    {memberLabel(m)}
-                  </span>
-                  <OptionSelect
-                    value={attendance[m._id] || "present"}
-                    onValueChange={(v) =>
-                      setAttendance((prev) => ({ ...prev, [m._id]: v }))
-                    }
-                    options={attendanceOptions}
-                    triggerClassName="h-7 w-[7.25rem] shrink-0 text-xs"
-                    size="sm"
-                  />
-                </div>
-              ))}
-            </div>
+            {!hasMounted ? (
+              <p className="text-xs text-muted-foreground">Loading members…</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {activeMembers.map((m) => (
+                  <div
+                    key={m._id}
+                    className="flex min-w-0 flex-col gap-1 rounded-md border px-2 py-1.5"
+                  >
+                    <div className="flex min-w-0 items-center justify-between gap-1">
+                      <span className="truncate text-xs font-medium">
+                        {memberLabel(m)}
+                      </span>
+                      <OptionSelect
+                        value={attendance[m._id] || "present"}
+                        onValueChange={(v) =>
+                          setAttendance((prev) => ({ ...prev, [m._id]: v }))
+                        }
+                        options={attendanceOptions}
+                        triggerClassName="h-7 w-[7.25rem] shrink-0 text-xs"
+                        size="sm"
+                      />
+                    </div>
+                    {isKametiOuting ? (
+                      <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Checkbox
+                          checked={kametiPaysShare[m._id] !== false}
+                          onCheckedChange={(v) =>
+                            setKametiPaysShare((prev) => ({
+                              ...prev,
+                              [m._id]: v === true,
+                            }))
+                          }
+                        />
+                        Pays share of bill
+                      </label>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <OptionSelect
                 key={guestPickerKey}
@@ -811,7 +902,11 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
           <h2 className="text-sm font-medium">Bill, split & parcels</h2>
           <div className="space-y-2">
             <div className="space-y-1">
-              <Label className="text-xs">Shared restaurant bill (PKR)</Label>
+              <Label className="text-xs">
+                {isKametiOuting
+                  ? "Total bill paid (PKR)"
+                  : "Shared restaurant bill (PKR)"}
+              </Label>
               <Input
                 className="h-8 max-w-xs"
                 type="number"
@@ -849,76 +944,104 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
               {parcels.map((p, idx) => (
                 <div
                   key={p.id}
-                  className="grid gap-1.5 rounded-md border p-2 sm:grid-cols-2"
+                  className="space-y-2 rounded-md border p-2"
                 >
-                  <OptionSelect
-                    value={refKey(p.orderedByKind, p.orderedById)}
-                    onValueChange={(val) => {
-                      const { kind, id } = parseRefKey(val);
-                      const name = participantDisplayName(
-                        kind,
-                        id,
-                        activeMembers,
-                        outingGuests,
-                      );
-                      const next = [...parcels];
-                      next[idx] = {
-                        ...p,
-                        orderedByKind: kind,
-                        orderedById: id,
-                        orderedByName: name,
-                      };
-                      setParcels(next);
-                    }}
-                    options={parcelOrderedByOptions}
-                    placeholder="Ordered by"
-                    triggerClassName="h-8 text-xs"
-                  />
-                  <Input
-                    className="h-8 text-xs"
-                    type="number"
-                    min={0}
-                    placeholder="Parcel amount PKR"
-                    value={p.amount}
-                    onChange={(e) => {
-                      const next = [...parcels];
-                      next[idx] = { ...p, amount: e.target.value };
-                      setParcels(next);
-                    }}
-                  />
-                  <OptionSelect
-                    value={refKey(p.paidByKind, p.paidById)}
-                    onValueChange={(val) => {
-                      const { kind, id } = parseRefKey(val);
-                      const name = participantDisplayName(
-                        kind,
-                        id,
-                        activeMembers,
-                        outingGuests,
-                      );
-                      const next = [...parcels];
-                      next[idx] = {
-                        ...p,
-                        paidByKind: kind,
-                        paidById: id,
-                        paidByName: name,
-                      };
-                      setParcels(next);
-                    }}
-                    options={parcelPaidByOptions}
-                    placeholder="Paid by"
-                    triggerClassName="h-8 text-xs"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={() =>
-                      setParcels((prev) => prev.filter((_, i) => i !== idx))
-                    }
-                  >
-                    Remove
-                  </Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground">
+                        Ordered by
+                      </Label>
+                      <OptionSelect
+                        value={
+                          p.orderedByKind && p.orderedById
+                            ? refKey(p.orderedByKind, p.orderedById)
+                            : ""
+                        }
+                        onValueChange={(val) => {
+                          const { kind, id } = parseRefKey(val);
+                          const name = participantDisplayName(
+                            kind,
+                            id,
+                            activeMembers,
+                            outingGuests,
+                          );
+                          const next = [...parcels];
+                          next[idx] = {
+                            ...p,
+                            orderedByKind: kind,
+                            orderedById: id,
+                            orderedByName: name,
+                          };
+                          setParcels(next);
+                        }}
+                        options={parcelOrderedByOptions}
+                        placeholder="Who ordered"
+                        triggerClassName="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground">
+                        Amount (PKR)
+                      </Label>
+                      <Input
+                        className="h-8 text-xs"
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        value={p.amount}
+                        onChange={(e) => {
+                          const next = [...parcels];
+                          next[idx] = { ...p, amount: e.target.value };
+                          setParcels(next);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <Label className="text-[11px] text-muted-foreground">
+                        Paid by (settlement)
+                      </Label>
+                      <OptionSelect
+                        value={
+                          p.paidByKind && p.paidById
+                            ? refKey(p.paidByKind, p.paidById)
+                            : ""
+                        }
+                        onValueChange={(val) => {
+                          const { kind, id } = parseRefKey(val);
+                          const name = participantDisplayName(
+                            kind,
+                            id,
+                            activeMembers,
+                            outingGuests,
+                          );
+                          const next = [...parcels];
+                          next[idx] = {
+                            ...p,
+                            paidByKind: kind,
+                            paidById: id,
+                            paidByName: name,
+                          };
+                          setParcels(next);
+                        }}
+                        options={parcelPaidByOptions}
+                        placeholder="Who paid"
+                        triggerClassName="h-8 text-xs"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      className="shrink-0"
+                      onClick={() =>
+                        setParcels((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -932,9 +1055,19 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Shared: <Money paisa={sharedBillPaisa} /> · Parcels:{" "}
-              <Money paisa={parcelTotalPaisa} /> · Total:{" "}
-              <Money paisa={grandTotalPaisa} />
+              {isKametiOuting ? (
+                <>
+                  Total bill: <Money paisa={sharedBillPaisa} /> · Parcels
+                  (within bill): <Money paisa={parcelTotalPaisa} /> · Kameti
+                  split: <Money paisa={kametiSplitPaisa} />
+                </>
+              ) : (
+                <>
+                  Shared: <Money paisa={sharedBillPaisa} /> · Parcels:{" "}
+                  <Money paisa={parcelTotalPaisa} /> · Total:{" "}
+                  <Money paisa={grandTotalPaisa} />
+                </>
+              )}
             </p>
           </div>
         </section>

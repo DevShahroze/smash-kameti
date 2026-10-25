@@ -1,4 +1,4 @@
-import { splitEqually, participantKey } from "@/lib/money";
+import { splitEqually, participantKey, sameParticipantRef } from "@/lib/money";
 import { ALLOCATION_TYPES, ATTENDANCE_STATUS } from "@/lib/constants";
 
 /**
@@ -32,6 +32,9 @@ export function buildAmericanAllocations({
 
   for (const parcel of parcels) {
     const ob = parcel.orderedBy;
+    if (sameParticipantRef(ob, parcel.paidBy)) {
+      continue;
+    }
     allocations.push({
       outingId,
       participantKind: ob.kind,
@@ -46,8 +49,18 @@ export function buildAmericanAllocations({
   return allocations;
 }
 
+function kametiAttendancePaysShare(row) {
+  if (row.paysShare === false) {
+    return false;
+  }
+  if (row.paysShare === true) {
+    return true;
+  }
+  return row.status === ATTENDANCE_STATUS.PRESENT;
+}
+
 /**
- * Kameti settlement: shared bill split among present members only (who ate).
+ * Kameti settlement: shared bill split among members marked Pays share.
  * Host payment is credited separately. Turns/attendance alone do not create debt.
  */
 export function buildKametiAllocations({
@@ -56,8 +69,13 @@ export function buildKametiAllocations({
   attendance = [],
   parcels = [],
 }) {
+  const parcelSum = (parcels || []).reduce(
+    (sum, p) => sum + (p.amountPaisa || 0),
+    0,
+  );
+  const kametiSharedPaisa = Math.max(0, (sharedBillPaisa || 0) - parcelSum);
   const chargeableParticipants = attendance
-    .filter((row) => row.status === ATTENDANCE_STATUS.PRESENT)
+    .filter(kametiAttendancePaysShare)
     .map((row) => ({
       kind: "member",
       refId: row.memberId,
@@ -66,7 +84,7 @@ export function buildKametiAllocations({
 
   return buildAmericanAllocations({
     outingId,
-    sharedBillPaisa,
+    sharedBillPaisa: kametiSharedPaisa,
     chargeableParticipants,
     parcels,
     sharedAllocationType: ALLOCATION_TYPES.KAMETI_SHARED,

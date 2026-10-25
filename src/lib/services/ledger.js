@@ -55,7 +55,9 @@ export async function resyncOutingsForKametiRotation(rotationId) {
 
 async function buildSettlementContext() {
   const [outings, turns, rotations] = await Promise.all([
-    Outing.find().select("_id paymentSystem kametiTurnId settlementsIncluded").lean(),
+    Outing.find()
+      .select("_id paymentSystem kametiTurnId settlementsIncluded hostMemberId")
+      .lean(),
     KametiTurn.find().select("_id rotationId outingId").lean(),
     KametiRotation.find().select("_id settlementsIncluded").lean(),
   ]);
@@ -94,11 +96,19 @@ async function buildSettlementContext() {
     outings.map((o) => [String(o._id), o.settlementsIncluded !== false]),
   );
 
+  const outingHostByOutingId = new Map(
+    outings.map((o) => [
+      String(o._id),
+      o.hostMemberId ? String(o.hostMemberId) : null,
+    ]),
+  );
+
   return {
     outingPaymentById,
     outingRotationByOutingId,
     settlementsIncludedByRotationId,
     settlementsIncludedByOutingId,
+    outingHostByOutingId,
   };
 }
 
@@ -146,8 +156,7 @@ export async function getSettlementBalances() {
 }
 
 export async function getSettlementLedger(options = {}) {
-  const { resync = false } = options;
-  if (resync) {
+  if (options.resync !== false) {
     await resyncSettlementsFromOutings();
   }
 

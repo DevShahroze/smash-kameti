@@ -70,6 +70,10 @@ export const OutingReadOnly = memo(function OutingReadOnly({ outing }) {
                 <li key={String(a.memberId)}>
                   {a.memberNameSnapshot}{" "}
                   <span className="text-muted-foreground">({a.status})</span>
+                  {outing.paymentSystem === "kameti" &&
+                  a.paysShare === false ? (
+                    <span className="text-muted-foreground"> · no share</span>
+                  ) : null}
                 </li>
               ))}
             </ul>

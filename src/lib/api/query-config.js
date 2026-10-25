@@ -22,6 +22,51 @@ export const queryKeys = {
   member: (id) => ["member", id],
 };
 
+/** Refetch Kameti list, rotation detail, and turns after bills or rotation edits. */
+export function invalidateKametiQueries(queryClient, options = {}) {
+  const { rotationId, turnId } = options;
+  const invalidations = [
+    queryClient.invalidateQueries({ queryKey: queryKeys.kametiRotations }),
+    queryClient.invalidateQueries({ queryKey: ["kameti-rotation"] }),
+    queryClient.invalidateQueries({ queryKey: ["kameti-turns"] }),
+    queryClient.invalidateQueries({ queryKey: ["kameti-turn"] }),
+  ];
+  if (rotationId) {
+    invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.kametiRotation(rotationId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.kametiTurns(rotationId),
+      }),
+    );
+  }
+  if (turnId) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: queryKeys.kametiTurn(turnId) }),
+    );
+  }
+  return Promise.all(invalidations);
+}
+
+/** Outings, dashboard, settlements, transactions, and Kameti caches. */
+export function invalidateOutingFinancials(queryClient, options = {}) {
+  const { outingId, rotationId, turnId } = options;
+  const invalidations = [
+    queryClient.invalidateQueries({ queryKey: queryKeys.outings }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.settlements }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.transactions }),
+    invalidateKametiQueries(queryClient, { rotationId, turnId }),
+  ];
+  if (outingId) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: queryKeys.outing(outingId) }),
+    );
+  }
+  return Promise.all(invalidations);
+}
+
 export const catalogQueries = [
   {
     queryKey: queryKeys.members,

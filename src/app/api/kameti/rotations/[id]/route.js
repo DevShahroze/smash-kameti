@@ -3,7 +3,9 @@ import { jsonOk, jsonError, parseBody } from "@/lib/api/http";
 import { rotationPatchSchema } from "@/lib/validation/schemas";
 import KametiRotation from "@/models/KametiRotation";
 import KametiTurn from "@/models/KametiTurn";
+import Outing from "@/models/Outing";
 import { resyncOutingsForKametiRotation } from "@/lib/services/ledger";
+import { enrichTurnWithBillStats } from "@/lib/services/kameti-bill-stats";
 import {
   isInvalidParamError,
   resolveRouteObjectId,
@@ -27,9 +29,23 @@ export async function GET(request, { params }) {
     if (!withTurns) {
       return jsonOk(rotation);
     }
-    const turns = await KametiTurn.find({ rotationId: id })
+    const turnsRaw = await KametiTurn.find({ rotationId: id })
       .sort({ turnNumber: 1 })
       .lean();
+    const outingIds = turnsRaw
+      .map((t) => t.outingId)
+      .filter(Boolean);
+    const outings = outingIds.length
+      ? await Outing.find({ _id: { $in: outingIds } })
+          .select("sharedBillPaisa parcels attendance")
+          .lean()
+      : [];
+    const outingById = new Map(
+      outings.map((o) => [String(o._id), o]),
+    );
+    const turns = turnsRaw.map((t) =>
+      enrichTurnWithBillStats(t, outingById),
+    );
     return jsonOk({ rotation, turns });
   } catch (err) {
     if (isInvalidParamError(err)) {

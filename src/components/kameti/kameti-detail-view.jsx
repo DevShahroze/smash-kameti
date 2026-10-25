@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
-import { queryKeys } from "@/lib/api/query-config";
+import {
+  invalidateKametiQueries,
+  queryKeys,
+} from "@/lib/api/query-config";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -13,8 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { paisaFromRupees, rupeesFromPaisa } from "@/lib/money";
 import {
   kametiBillPath,
   rotationStartedOn,
@@ -26,6 +27,61 @@ import { SettlementsSummary } from "@/components/settlements/settlements-summary
 import { AdminOnly } from "@/components/auth/admin-only";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Money } from "@/components/money";
+
+function KametiPerMemberPay({
+  rows,
+  payersCount,
+  treatSharePerMemberPaisa,
+}) {
+  return (
+    <div className="mt-3 space-y-1 rounded-md border bg-background/80 p-2 text-xs">
+      <p className="font-medium">
+        What each person pays
+        {payersCount > 0 ? (
+          <span className="font-normal text-muted-foreground">
+            {" "}
+            (treat{" "}
+            <Money paisa={treatSharePerMemberPaisa} className="inline" /> each
+            for {payersCount} with Pays share)
+          </span>
+        ) : null}
+      </p>
+      <ul className="divide-y">
+        {rows.map((row) => (
+          <li
+            key={row.memberId}
+            className="flex flex-wrap items-center justify-between gap-x-2 py-1"
+          >
+            <span className="font-medium">{row.name}</span>
+            <span className="tabular-nums text-muted-foreground">
+              {row.treatSharePaisa > 0 ? (
+                <>
+                  Treat <Money paisa={row.treatSharePaisa} className="inline" />
+                </>
+              ) : (
+                <span>No treat share</span>
+              )}
+              {row.parcelPaisa > 0 ? (
+                <>
+                  {" · "}
+                  Parcel <Money paisa={row.parcelPaisa} className="inline" />
+                </>
+              ) : null}
+              <span className="text-foreground">
+                {" "}
+                = <Money paisa={row.totalPayPaisa} className="inline" />
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[10px] text-muted-foreground">
+        Parcels are personal (American settlement). Host credit is on the full
+        bill in Kameti settlement.
+      </p>
+    </div>
+  );
+}
 
 export function KametiDetailView({ rotationId }) {
   const { isAdmin } = useAuth();
@@ -48,12 +104,9 @@ export function KametiDetailView({ rotationId }) {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.kametiRotations });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.kametiRotation(rotationId),
-      });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["settlements"] });
+      void invalidateKametiQueries(queryClient, { rotationId });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settlements });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -65,11 +118,10 @@ export function KametiDetailView({ rotationId }) {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.kametiRotation(rotationId),
-      });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["settlements"] });
+      void invalidateKametiQueries(queryClient, { rotationId });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outings });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settlements });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -91,8 +143,16 @@ export function KametiDetailView({ rotationId }) {
 
   const pending = turns.filter((t) => t.status === "pending");
   const completedTurns = turns.filter((t) => t.status === "completed");
+  const totalBillPaidPaisa = turns.reduce(
+    (sum, t) => sum + (t.totalBillPaisa || 0),
+    0,
+  );
   const totalTreatPaisa = turns.reduce(
     (sum, t) => sum + (t.treatAmountPaisa || 0),
+    0,
+  );
+  const completedBillPaidPaisa = completedTurns.reduce(
+    (sum, t) => sum + (t.totalBillPaisa || 0),
     0,
   );
   const completedTreatPaisa = completedTurns.reduce(
@@ -160,7 +220,7 @@ export function KametiDetailView({ rotationId }) {
         </p>
       </div>
 
-      <section className="grid gap-2 rounded-lg border bg-muted/20 p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-2 rounded-lg border bg-muted/20 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div>
           <p className="text-muted-foreground">Turns</p>
           <p className="font-medium tabular-nums">
@@ -168,13 +228,31 @@ export function KametiDetailView({ rotationId }) {
           </p>
         </div>
         <div>
-          <p className="text-muted-foreground">Treat total (all turns)</p>
+          <p className="text-muted-foreground">Total bills paid (all turns)</p>
           <p className="font-medium">
-            <Money paisa={totalTreatPaisa} />
+            <Money paisa={totalBillPaidPaisa} />
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            Shared + parcels
           </p>
         </div>
         <div>
-          <p className="text-muted-foreground">Recorded on completed turns</p>
+          <p className="text-muted-foreground">Kameti split (all turns)</p>
+          <p className="font-medium">
+            <Money paisa={totalTreatPaisa} />
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            Bill minus parcels
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Completed — total paid</p>
+          <p className="font-medium">
+            <Money paisa={completedBillPaidPaisa} />
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Completed — Kameti split</p>
           <p className="font-medium">
             <Money paisa={completedTreatPaisa} />
           </p>
@@ -219,6 +297,13 @@ export function KametiDetailView({ rotationId }) {
                   </Link>
                 ) : null}
               </div>
+              {pending[0].perMemberPay?.length > 0 ? (
+                <KametiPerMemberPay
+                  rows={pending[0].perMemberPay}
+                  payersCount={pending[0].payersCount}
+                  treatSharePerMemberPaisa={pending[0].treatSharePerMemberPaisa}
+                />
+              ) : null}
             </div>
           ) : turns.length > 0 && completedTurns.length === turns.length ? (
             <p className="text-sm text-muted-foreground">
@@ -265,39 +350,35 @@ export function KametiDetailView({ rotationId }) {
                     <TableHead>#</TableHead>
                     <TableHead>Member</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Total paid</TableHead>
+                    <TableHead>Kameti split</TableHead>
+                    <TableHead>Each pays (treat)</TableHead>
                     {isAdmin ? <TableHead /> : <TableHead>Bill</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {turns.map((t) => (
-                    <TableRow key={t._id}>
+                    <TableRow key={t._id} className="align-top">
                       <TableCell>{t.turnNumber}</TableCell>
                       <TableCell>{t.memberNameSnapshot}</TableCell>
                       <TableCell className="capitalize">{t.status}</TableCell>
                       <TableCell>
-                        {isAdmin ? (
-                          <Input
-                            key={`${t._id}-${t.treatAmountPaisa}`}
-                            className="h-7 w-20 px-2 text-xs"
-                            type="number"
-                            defaultValue={
-                              rupeesFromPaisa(t.treatAmountPaisa) || ""
-                            }
-                            onBlur={(e) => {
-                              const paisa = e.target.value
-                                ? paisaFromRupees(e.target.value)
-                                : 0;
-                              if (paisa !== t.treatAmountPaisa) {
-                                updateTurn.mutate({
-                                  id: t._id,
-                                  body: { treatAmountPaisa: paisa },
-                                });
-                              }
-                            }}
-                          />
+                        <Money paisa={t.totalBillPaisa || 0} />
+                      </TableCell>
+                      <TableCell>
+                        <Money paisa={t.treatAmountPaisa || 0} />
+                      </TableCell>
+                      <TableCell>
+                        {t.payersCount > 0 ? (
+                          <span className="tabular-nums">
+                            <Money paisa={t.treatSharePerMemberPaisa || 0} />
+                            <span className="text-muted-foreground">
+                              {" "}
+                              × {t.payersCount}
+                            </span>
+                          </span>
                         ) : (
-                          <Money paisa={t.treatAmountPaisa} />
+                          "—"
                         )}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
@@ -357,6 +438,27 @@ export function KametiDetailView({ rotationId }) {
                 </TableBody>
               </Table>
             )}
+            {completedTurns.some((t) => t.perMemberPay?.length > 0) ? (
+              <div className="mt-4 space-y-3 border-t pt-3">
+                <h3 className="text-xs font-medium text-muted-foreground">
+                  Per person by completed turn
+                </h3>
+                {completedTurns
+                  .filter((t) => t.perMemberPay?.length > 0)
+                  .map((t) => (
+                    <div key={t._id} className="space-y-1">
+                      <p className="text-xs font-medium">
+                        Week {t.turnNumber} — {t.memberNameSnapshot}
+                      </p>
+                      <KametiPerMemberPay
+                        rows={t.perMemberPay}
+                        payersCount={t.payersCount}
+                        treatSharePerMemberPaisa={t.treatSharePerMemberPaisa}
+                      />
+                    </div>
+                  ))}
+              </div>
+            ) : null}
           </section>
 
           {rotation.notes ? (

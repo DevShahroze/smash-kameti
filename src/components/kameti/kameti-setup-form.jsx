@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import {
+  invalidateKametiQueries,
+  queryKeys,
+} from "@/lib/api/query-config";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -116,8 +120,10 @@ export function KametiSetupForm() {
       });
     },
     onSuccess: (rotation) => {
-      queryClient.invalidateQueries({ queryKey: ["kameti-rotations"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void invalidateKametiQueries(queryClient, {
+        rotationId: rotation?._id ? String(rotation._id) : undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
       toast.success("Kameti rotation saved");
       router.push(`/kameti/${rotation._id}`);
     },

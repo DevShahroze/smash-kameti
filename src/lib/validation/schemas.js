@@ -81,6 +81,7 @@ export const outingSchema = z.object({
           ATTENDANCE_STATUS.ABSENT,
           ATTENDANCE_STATUS.NOT_RECORDED,
         ]),
+        paysShare: z.boolean().optional().default(true),
       }),
     )
     .optional()

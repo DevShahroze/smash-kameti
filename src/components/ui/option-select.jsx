@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { cn } from "cn";
 import {
   Select,
@@ -29,14 +28,6 @@ export function OptionSelect({
       ? null
       : String(value);
 
-  const labelByValue = useMemo(
-    () =>
-      Object.fromEntries(
-        options.map((opt) => [String(opt.value), opt.label]),
-      ),
-    [options],
-  );
-
   function handleValueChange(next) {
     if (next === null || next === undefined) {
       onValueChange?.("");
@@ -54,14 +45,13 @@ export function OptionSelect({
       value={normalizedValue}
       onValueChange={handleValueChange}
       disabled={disabled}
+      items={options}
     >
       <SelectTrigger
         size={size}
         className={cn("w-full min-w-0", triggerClassName, className)}
       >
-        <SelectValue placeholder={placeholder}>
-          {normalizedValue ? labelByValue[normalizedValue] ?? null : null}
-        </SelectValue>
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className={contentClassName}>
         {options.map((opt) => (

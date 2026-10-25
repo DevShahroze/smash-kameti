@@ -7,14 +7,17 @@ import {
 } from "@/lib/accounting/outing-ledger";
 import AuditLog from "@/models/AuditLog";
 import KametiTurn from "@/models/KametiTurn";
+import { billStatsFromOuting } from "@/lib/services/kameti-bill-stats";
 
 async function linkKametiTurn(outing) {
   if (!outing.kametiTurnId) {
     return;
   }
+  const stats = billStatsFromOuting(outing);
   await KametiTurn.findByIdAndUpdate(outing.kametiTurnId, {
     outingId: outing._id,
-    treatAmountPaisa: outing.sharedBillPaisa,
+    treatAmountPaisa: stats.treatAmountPaisa,
+    totalBillPaisa: stats.totalBillPaisa,
   });
 }
 
@@ -75,6 +78,7 @@ export function mapOutingInput(parsed) {
       memberId: new mongoose.Types.ObjectId(a.memberId),
       memberNameSnapshot: a.memberNameSnapshot,
       status: a.status,
+      paysShare: a.paysShare !== false,
     })),
     guests: (parsed.guests || []).map((g) => ({
       guestId: g.guestId ? new mongoose.Types.ObjectId(g.guestId) : null,
@@ -157,12 +161,13 @@ export async function updateOuting(id, parsed) {
 async function unlinkKametiTurnForOuting(outing) {
   await KametiTurn.updateMany(
     { outingId: outing._id },
-    { outingId: null, treatAmountPaisa: 0 },
+    { outingId: null, treatAmountPaisa: 0, totalBillPaisa: 0 },
   );
   if (outing.kametiTurnId) {
     await KametiTurn.findByIdAndUpdate(outing.kametiTurnId, {
       outingId: null,
       treatAmountPaisa: 0,
+      totalBillPaisa: 0,
     });
   }
 }

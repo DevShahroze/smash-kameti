@@ -21,6 +21,7 @@ export function kametiBillPath(turn) {
     paymentSystem: "kameti",
     kametiTurnId: String(turn._id),
     hostMemberId: memberId,
+    hostMemberName: turn.memberNameSnapshot || "",
     weekNumber: String(turn.turnNumber ?? ""),
     status: "completed",
   });

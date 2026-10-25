@@ -53,6 +53,13 @@ export function participantKey(kind, id) {
   return `${kind}:${String(id)}`;
 }
 
+export function sameParticipantRef(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+  return participantKey(a.kind, a.refId) === participantKey(b.kind, b.refId);
+}
+
 export function parseParticipantKey(key) {
   const [kind, id] = key.split(":");
   return { kind, id };

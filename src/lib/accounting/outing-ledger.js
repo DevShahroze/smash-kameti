@@ -8,6 +8,7 @@ import {
   buildAmericanAllocations,
   buildKametiAllocations,
 } from "@/lib/accounting/american";
+import { sameParticipantRef } from "@/lib/money";
 import ExpenseAllocation from "@/models/ExpenseAllocation";
 import Transaction from "@/models/Transaction";
 import GroupSettings from "@/models/GroupSettings";
@@ -106,8 +107,9 @@ export async function syncOutingFinancials(outing, session = null) {
   }
 
   for (const payment of outing.payments || []) {
-    const isParcel = String(payment.appliesTo || "").startsWith("parcel:");
-    const affects = true;
+    if (String(payment.appliesTo || "").startsWith("parcel:")) {
+      continue;
+    }
     transactions.push({
       outingId,
       source: "outing_sync",
@@ -119,10 +121,36 @@ export async function syncOutingFinancials(outing, session = null) {
       payerKind: payment.paidBy.kind,
       payerId: payment.paidBy.refId,
       payerNameSnapshot: payment.paidBy.nameSnapshot,
-      affectsSettlement: affects,
+      affectsSettlement: true,
       transactionDate: outing.actualDate || outing.scheduledDate || new Date(),
-      notes: payment.appliesTo === "shared" ? "Shared bill" : "Parcel payment",
+      notes: "Shared bill",
       paymentMethod: payment.paymentMethod || "",
+    });
+  }
+
+  for (const parcel of outing.parcels || []) {
+    const amountPaisa = parcel.amountPaisa || 0;
+    if (amountPaisa <= 0 || !parcel.paidBy || !parcel.orderedBy) {
+      continue;
+    }
+    if (sameParticipantRef(parcel.orderedBy, parcel.paidBy)) {
+      continue;
+    }
+    transactions.push({
+      outingId,
+      source: "outing_sync",
+      type:
+        outing.paymentSystem === PAYMENT_SYSTEMS.AMERICAN
+          ? TRANSACTION_TYPES.AMERICAN_CONTRIBUTION
+          : TRANSACTION_TYPES.RESTAURANT_BILL,
+      amountPaisa,
+      payerKind: parcel.paidBy.kind,
+      payerId: parcel.paidBy.refId,
+      payerNameSnapshot: parcel.paidBy.nameSnapshot,
+      affectsSettlement: true,
+      transactionDate: outing.actualDate || outing.scheduledDate || new Date(),
+      notes: "Parcel payment",
+      paymentMethod: "",
     });
   }
 

@@ -44,6 +44,8 @@ const AttendanceSchema = new mongoose.Schema(
       enum: Object.values(ATTENDANCE_STATUS),
       default: ATTENDANCE_STATUS.NOT_RECORDED,
     },
+    /** Kameti: include in shared-bill split when true (default). */
+    paysShare: { type: Boolean, default: true },
   },
   { _id: false },
 );

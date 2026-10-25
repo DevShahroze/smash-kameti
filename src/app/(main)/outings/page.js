@@ -4,7 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
-import { queryKeys } from "@/lib/api/query-config";
+import {
+  invalidateOutingFinancials,
+  queryKeys,
+} from "@/lib/api/query-config";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +31,11 @@ import {
 import { AdminOnly } from "@/components/auth/admin-only";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Money } from "@/components/money";
+import { PAYMENT_SYSTEMS } from "@/lib/constants";
+import {
+  kametiSplitPaisa,
+  parcelTotalPaisa,
+} from "@/lib/services/kameti-bill-stats";
 import { format } from "date-fns";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,11 +54,7 @@ export default function OutingsPage() {
     mutationFn: (id) =>
       apiFetch(`/api/outings/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["outings"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["settlements"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["kameti"] });
+      void invalidateOutingFinancials(queryClient);
       toast.success("Outing deleted");
       setDeleteTarget(null);
     },
@@ -78,6 +82,7 @@ export default function OutingsPage() {
             <TableHead>System</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Bill</TableHead>
+            <TableHead className="text-right">Kameti split</TableHead>
             {isAdmin ? (
               <TableHead className="w-[88px] text-right">Actions</TableHead>
             ) : null}
@@ -113,7 +118,20 @@ export default function OutingsPage() {
                 ) : null}
               </TableCell>
               <TableCell className="text-right">
-                <Money paisa={o.sharedBillPaisa} />
+                <Money
+                  paisa={
+                    o.paymentSystem === PAYMENT_SYSTEMS.KAMETI
+                      ? o.sharedBillPaisa || 0
+                      : (o.sharedBillPaisa || 0) + parcelTotalPaisa(o)
+                  }
+                />
+              </TableCell>
+              <TableCell className="text-right">
+                {o.paymentSystem === PAYMENT_SYSTEMS.KAMETI ? (
+                  <Money paisa={kametiSplitPaisa(o)} />
+                ) : (
+                  "—"
+                )}
               </TableCell>
               {isAdmin ? (
                 <TableCell className="text-right">

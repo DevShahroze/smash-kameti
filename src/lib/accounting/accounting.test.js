@@ -6,6 +6,8 @@ import {
 } from "@/lib/accounting/american";
 import {
   computeSettlementTransfers,
+  filterAllocationsForScope,
+  filterTransactionsForScope,
   SETTLEMENT_SCOPE,
 } from "@/lib/accounting/settlement-scopes";
 import { PAYMENT_SYSTEMS } from "@/lib/constants";
@@ -50,6 +52,23 @@ describe("American allocations", () => {
     expect(allocations.every((a) => a.amountPaisa === paisaFromRupees(2500))).toBe(
       true,
     );
+  });
+
+  it("skips settlement entries when parcel orderer paid for it themselves", () => {
+    const allocations = buildAmericanAllocations({
+      outingId: "o1",
+      sharedBillPaisa: 0,
+      chargeableParticipants: [],
+      parcels: [
+        {
+          _id: "p-self",
+          orderedBy: { kind: "member", refId: "ali", nameSnapshot: "Ali" },
+          paidBy: { kind: "member", refId: "ali", nameSnapshot: "Ali" },
+          amountPaisa: paisaFromRupees(500),
+        },
+      ],
+    });
+    expect(allocations).toEqual([]);
   });
 
   it("includes chargeable guest and parcels separately", () => {
@@ -261,15 +280,65 @@ describe("balances and settlements", () => {
     );
   });
 
-  it("kameti settlement splits shared bill among present members", () => {
+  it("kameti splits total bill minus parcels among members who pay share", () => {
+    const allocations = buildKametiAllocations({
+      outingId: "o-k-parcel",
+      sharedBillPaisa: paisaFromRupees(10000),
+      attendance: [
+        {
+          memberId: "host",
+          memberNameSnapshot: "Host",
+          status: "present",
+          paysShare: true,
+        },
+        {
+          memberId: "a",
+          memberNameSnapshot: "A",
+          status: "present",
+          paysShare: true,
+        },
+      ],
+      parcels: [
+        {
+          _id: "p1",
+          orderedBy: { kind: "member", refId: "a", nameSnapshot: "A" },
+          paidBy: { kind: "member", refId: "host", nameSnapshot: "Host" },
+          amountPaisa: paisaFromRupees(2000),
+        },
+      ],
+    });
+    const shared = allocations.filter(
+      (a) => a.allocationType === "kameti_shared",
+    );
+    expect(shared.reduce((s, a) => s + a.amountPaisa, 0)).toBe(
+      paisaFromRupees(8000),
+    );
+  });
+
+  it("kameti settlement splits shared bill among members who pay share", () => {
     const participants = [m("host", "Host"), m("a", "A"), m("b", "B")];
     const allocations = buildKametiAllocations({
       outingId: "o-k",
       sharedBillPaisa: paisaFromRupees(9000),
       attendance: [
-        { memberId: "host", memberNameSnapshot: "Host", status: "present" },
-        { memberId: "a", memberNameSnapshot: "A", status: "present" },
-        { memberId: "b", memberNameSnapshot: "B", status: "present" },
+        {
+          memberId: "host",
+          memberNameSnapshot: "Host",
+          status: "present",
+          paysShare: true,
+        },
+        {
+          memberId: "a",
+          memberNameSnapshot: "A",
+          status: "present",
+          paysShare: true,
+        },
+        {
+          memberId: "b",
+          memberNameSnapshot: "B",
+          status: "absent",
+          paysShare: true,
+        },
       ],
       parcels: [],
     });
@@ -299,6 +368,31 @@ describe("balances and settlements", () => {
     });
     expect(transfers.length).toBeGreaterThan(0);
     expect(transfers.every((t) => t.toName === "Host")).toBe(true);
+  });
+
+  it("kameti excludes absent members when Pays share is unchecked", () => {
+    const allocations = buildKametiAllocations({
+      outingId: "o-k2",
+      sharedBillPaisa: paisaFromRupees(9000),
+      attendance: [
+        {
+          memberId: "host",
+          memberNameSnapshot: "Host",
+          status: "present",
+          paysShare: true,
+        },
+        {
+          memberId: "a",
+          memberNameSnapshot: "A",
+          status: "absent",
+          paysShare: false,
+        },
+      ],
+      parcels: [],
+    });
+    const shared = allocations.filter((a) => a.allocationType === "kameti_shared");
+    expect(shared).toHaveLength(1);
+    expect(String(shared[0].participantId)).toBe("host");
   });
 
   it("excludes a Kameti rotation marked settled from kameti and overall settlements", () => {
@@ -400,6 +494,7 @@ describe("balances and settlements", () => {
         payerNameSnapshot: "Ali",
         affectsSettlement: true,
         outingId: "o-k",
+        notes: "Parcel payment",
       },
     ];
     const american = computeSettlementTransfers({
@@ -413,7 +508,7 @@ describe("balances and settlements", () => {
       expect.objectContaining({
         fromName: "Ahmed",
         toName: "Ali",
-        amountPaisa: paisaFromRupees(2000),
+        amountPaisa: paisaFromRupees(2500),
       }),
     ]);
     const kameti = computeSettlementTransfers({
@@ -423,12 +518,109 @@ describe("balances and settlements", () => {
       participants,
       settlementContext,
     });
-    expect(kameti).toEqual([
+    expect(kameti).toEqual([]);
+    const americanParcelOnly = computeSettlementTransfers({
+      scope: SETTLEMENT_SCOPE.AMERICAN,
+      allocations: allocations.filter((a) => a.outingId === "o-k"),
+      transactions: transactions.filter((t) => t.outingId === "o-k"),
+      participants,
+      settlementContext,
+    });
+    expect(americanParcelOnly).toEqual([
       expect.objectContaining({
         fromName: "Ahmed",
         toName: "Ali",
         amountPaisa: paisaFromRupees(500),
       }),
     ]);
+  });
+
+  it("kameti host-paid parcel appears in american but not double-counted in overall", () => {
+    const participants = [m("host", "Host"), m("ahmed", "Ahmed")];
+    const settlementContext = {
+      outingPaymentById: new Map([["o-k", PAYMENT_SYSTEMS.KAMETI]]),
+      outingRotationByOutingId: new Map([["o-k", "rot-k"]]),
+      settlementsIncludedByRotationId: new Map([["rot-k", true]]),
+      settlementsIncludedByOutingId: new Map([["o-k", true]]),
+      outingHostByOutingId: new Map([["o-k", "host"]]),
+    };
+    const allocations = buildKametiAllocations({
+      outingId: "o-k",
+      sharedBillPaisa: paisaFromRupees(10000),
+      attendance: [
+        {
+          memberId: "host",
+          memberNameSnapshot: "Host",
+          status: "present",
+          paysShare: true,
+        },
+        {
+          memberId: "ahmed",
+          memberNameSnapshot: "Ahmed",
+          status: "present",
+          paysShare: true,
+        },
+      ],
+      parcels: [
+        {
+          _id: "p1",
+          orderedBy: { kind: "member", refId: "ahmed", nameSnapshot: "Ahmed" },
+          paidBy: { kind: "member", refId: "host", nameSnapshot: "Host" },
+          amountPaisa: paisaFromRupees(2000),
+        },
+      ],
+    });
+    const transactions = [
+      {
+        type: TRANSACTION_TYPES.RESTAURANT_BILL,
+        amountPaisa: paisaFromRupees(10000),
+        payerKind: "member",
+        payerId: "host",
+        payerNameSnapshot: "Host",
+        affectsSettlement: true,
+        outingId: "o-k",
+        notes: "Shared bill",
+      },
+      {
+        type: TRANSACTION_TYPES.RESTAURANT_BILL,
+        amountPaisa: paisaFromRupees(2000),
+        payerKind: "member",
+        payerId: "host",
+        payerNameSnapshot: "Host",
+        affectsSettlement: true,
+        outingId: "o-k",
+        notes: "Parcel payment",
+      },
+    ];
+    const american = computeSettlementTransfers({
+      scope: SETTLEMENT_SCOPE.AMERICAN,
+      allocations,
+      transactions,
+      participants,
+      settlementContext,
+    });
+    expect(american).toEqual([
+      expect.objectContaining({
+        fromName: "Ahmed",
+        toName: "Host",
+        amountPaisa: paisaFromRupees(2000),
+      }),
+    ]);
+    const overallRows = balancesToArray(
+      computeBalances({
+        allocations: filterAllocationsForScope(
+          allocations,
+          SETTLEMENT_SCOPE.OVERALL,
+          settlementContext,
+        ),
+        transactions: filterTransactionsForScope(
+          transactions,
+          SETTLEMENT_SCOPE.OVERALL,
+          settlementContext,
+        ),
+        participants,
+      }),
+    );
+    expect(sumNetBalances(overallRows)).toBe(0);
   });
 });
