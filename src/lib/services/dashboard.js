@@ -4,7 +4,7 @@ import KametiTurn from "@/models/KametiTurn";
 import KametiRotation from "@/models/KametiRotation";
 import Transaction from "@/models/Transaction";
 import { TURN_STATUS, PAYMENT_SYSTEMS, OUTING_STATUS } from "@/lib/constants";
-import { getSettlementLedger } from "@/lib/services/ledger";
+import { getSettlementBalances } from "@/lib/services/ledger";
 import GroupSettings from "@/models/GroupSettings";
 
 export async function getDashboardData() {
@@ -13,7 +13,7 @@ export async function getDashboardData() {
     activeRotation,
     recentOutings,
     recentTransactions,
-    ledger,
+    balances,
     settings,
   ] = await Promise.all([
     Member.find({ active: true }).lean(),
@@ -23,7 +23,7 @@ export async function getDashboardData() {
       .limit(8)
       .lean(),
     Transaction.find().sort({ transactionDate: -1 }).limit(8).lean(),
-    getSettlementLedger(),
+    getSettlementBalances(),
     GroupSettings.findOne().lean(),
   ]);
 
@@ -41,7 +41,7 @@ export async function getDashboardData() {
   ).length;
   const pendingTurns = turns.filter((t) => t.status === TURN_STATUS.PENDING);
 
-  const memberBalances = ledger.balances.filter((b) => b.kind === "member");
+  const memberBalances = balances.filter((b) => b.kind === "member");
   const unsettled = memberBalances.filter((b) => b.netBalancePaisa !== 0);
 
   const totalRestaurant = await Transaction.aggregate([

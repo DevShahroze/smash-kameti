@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ import { AdminOnly } from "@/components/auth/admin-only";
 export default function VenuesPage() {
   const queryClient = useQueryClient();
   const { data: venues = [], isLoading } = useQuery({
-    queryKey: ["venues"],
+    queryKey: queryKeys.venues,
     queryFn: () => apiFetch("/api/venues"),
   });
   const [name, setName] = useState("");
@@ -33,7 +34,7 @@ export default function VenuesPage() {
         body: JSON.stringify({ name }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["venues"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.venues });
       setName("");
       toast.success("Venue added");
     },

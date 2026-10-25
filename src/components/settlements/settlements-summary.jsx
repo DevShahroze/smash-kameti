@@ -1,8 +1,13 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import {
+  QUERY_STALE_SETTLEMENTS_MS,
+  queryKeys,
+} from "@/lib/api/query-config";
 import { Money } from "@/components/money";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,14 +16,14 @@ import { cn } from "@/lib/utils";
  * Live group balances — works during an active Kameti rotation.
  * American splits & personal parcels update settlements; Kameti treat bills do not split the group.
  */
-export function SettlementsSummary({
+export const SettlementsSummary = memo(function SettlementsSummary({
   compact = false,
   className,
 }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["settlements"],
+    queryKey: queryKeys.settlements,
     queryFn: () => apiFetch("/api/settlements"),
-    staleTime: 120_000,
+    staleTime: QUERY_STALE_SETTLEMENTS_MS,
   });
 
   if (isLoading) {
@@ -85,4 +90,4 @@ export function SettlementsSummary({
       )}
     </section>
   );
-}
+});

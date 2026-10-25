@@ -1,14 +1,45 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
+import { usePathname } from "next/navigation"
 import { cva } from "class-variance-authority";
 import { cn } from "cn"
+import { logTabView } from "@/lib/logging/activity-logger"
 
 function Tabs({
   className,
   orientation = "horizontal",
+  onValueChange,
+  defaultValue,
+  value,
   ...props
 }) {
+  const pathname = usePathname()
+  const loggedInitial = useRef(false)
+
+  useEffect(() => {
+    loggedInitial.current = false
+  }, [pathname])
+
+  useEffect(() => {
+    if (loggedInitial.current) {
+      return
+    }
+    const initial = value ?? defaultValue
+    if (initial != null && initial !== "") {
+      loggedInitial.current = true
+      logTabView(pathname, String(initial))
+    }
+  }, [pathname, value, defaultValue])
+
+  function handleValueChange(next, eventDetails) {
+    if (next != null && next !== "") {
+      logTabView(pathname, String(next))
+    }
+    onValueChange?.(next, eventDetails)
+  }
+
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
@@ -17,6 +48,9 @@ function Tabs({
         "group/tabs flex gap-2 data-horizontal:flex-col",
         className
       )}
+      defaultValue={defaultValue}
+      value={value}
+      onValueChange={handleValueChange}
       {...props}
     />
   )

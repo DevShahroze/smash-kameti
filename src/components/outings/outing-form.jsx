@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { paisaFromRupees, rupeesFromPaisa } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,15 +88,15 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
   const isEdit = Boolean(initialOuting);
 
   const { data: members = [] } = useQuery({
-    queryKey: ["members"],
+    queryKey: queryKeys.members,
     queryFn: () => apiFetch("/api/members"),
   });
   const { data: venues = [] } = useQuery({
-    queryKey: ["venues"],
+    queryKey: queryKeys.venues,
     queryFn: () => apiFetch("/api/venues"),
   });
   const { data: guests = [] } = useQuery({
-    queryKey: ["guests"],
+    queryKey: queryKeys.guests,
     queryFn: () => apiFetch("/api/guests"),
   });
   const [weekNumber, setWeekNumber] = useState(() =>
@@ -139,18 +140,28 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
   const isKametiOuting = paymentSystem === "kameti";
   const isAmericanOuting = paymentSystem === "american";
 
+  const fixedKametiTurnId =
+    kametiTurnId || initialOuting?.kametiTurnId || prefill?.kametiTurnId || "";
+
   const { data: rotations = [] } = useQuery({
-    queryKey: ["kameti-rotations"],
+    queryKey: queryKeys.kametiRotations,
     queryFn: () => apiFetch("/api/kameti/rotations"),
-    enabled: isKametiOuting,
+    enabled: isKametiOuting && !fixedKametiTurnId,
   });
 
   const activeRotation = rotations.find((r) => r.active) || rotations[0];
   const { data: turns = [] } = useQuery({
-    queryKey: ["kameti-turns", activeRotation?._id],
+    queryKey: queryKeys.kametiTurns(activeRotation?._id),
     queryFn: () =>
       apiFetch(`/api/kameti/turns?rotationId=${activeRotation._id}`),
-    enabled: isKametiOuting && Boolean(activeRotation?._id),
+    enabled:
+      isKametiOuting && Boolean(activeRotation?._id) && !fixedKametiTurnId,
+  });
+
+  const { data: kametiTurnById } = useQuery({
+    queryKey: queryKeys.kametiTurn(fixedKametiTurnId),
+    queryFn: () => apiFetch(`/api/kameti/turns/${fixedKametiTurnId}`),
+    enabled: isKametiOuting && Boolean(fixedKametiTurnId),
   });
 
   const activeMembers = useMemo(
@@ -207,10 +218,12 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     !initialOuting && paymentSystem === "kameti" && kametiTurnId,
   );
 
-  const linkedKametiTurn = useMemo(
-    () => turns.find((t) => String(t._id) === String(kametiTurnId)),
-    [turns, kametiTurnId],
-  );
+  const linkedKametiTurn = useMemo(() => {
+    if (kametiTurnById) {
+      return kametiTurnById;
+    }
+    return turns.find((t) => String(t._id) === String(kametiTurnId));
+  }, [kametiTurnById, turns, kametiTurnId]);
 
   const linkedHost = useMemo(
     () => activeMembers.find((m) => String(m._id) === String(hostMemberId)),
@@ -433,7 +446,7 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
       method: "POST",
       body: JSON.stringify({ name: newVenueName.trim() }),
     });
-    queryClient.invalidateQueries({ queryKey: ["venues"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.venues });
     return {
       venueId: created._id,
       venueNameSnapshot: created.name,

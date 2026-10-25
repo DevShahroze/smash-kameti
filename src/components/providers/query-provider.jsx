@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { QUERY_GC_MS, QUERY_STALE_MS } from "@/lib/api/query-config";
 
 export function QueryProvider({ children }) {
   const [client] = useState(
@@ -9,8 +10,16 @@ export function QueryProvider({ children }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60_000,
+            staleTime: QUERY_STALE_MS,
+            gcTime: QUERY_GC_MS,
             refetchOnWindowFocus: false,
+            refetchOnMount: false,
+            refetchOnReconnect: true,
+            structuralSharing: true,
+            retry: 1,
+          },
+          mutations: {
+            retry: 0,
           },
         },
       }),

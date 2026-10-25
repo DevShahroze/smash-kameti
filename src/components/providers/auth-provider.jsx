@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useLayoutEffect, useMemo } from "react";
 import { ROLES } from "@/lib/auth/session";
+import { setActivityLoggingEnabled } from "@/lib/logging/activity-logger";
 
 const AuthContext = createContext({
   role: ROLES.GUEST,
@@ -18,6 +19,11 @@ export function AuthProvider({ role, children }) {
     }),
     [role],
   );
+
+  useLayoutEffect(() => {
+    setActivityLoggingEnabled(role === ROLES.ADMIN);
+  }, [role]);
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

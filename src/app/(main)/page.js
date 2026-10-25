@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -27,7 +28,7 @@ function paymentLabel(system) {
 export default function DashboardPage() {
   const { isAdmin } = useAuth();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["dashboard"],
+    queryKey: queryKeys.dashboard,
     queryFn: () => apiFetch("/api/dashboard"),
   });
 

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { AppShell } from "@/components/layout/app-shell";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { QueryPrefetch } from "@/components/providers/query-prefetch";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { COOKIE_NAME, parseSessionToken, ROLES } from "@/lib/auth/session";
@@ -13,6 +14,7 @@ export default async function MainLayout({ children }) {
   return (
     <QueryProvider>
       <AuthProvider role={role}>
+        <QueryPrefetch />
         <AppShell role={role}>{children}</AppShell>
         <Toaster richColors position="top-right" />
       </AuthProvider>

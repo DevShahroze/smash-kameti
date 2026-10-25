@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -21,7 +22,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 export default function KametiListPage() {
   const { isAdmin } = useAuth();
   const { data: rotations = [], isLoading } = useQuery({
-    queryKey: ["kameti-rotations"],
+    queryKey: queryKeys.kametiRotations,
     queryFn: () => apiFetch("/api/kameti/rotations"),
   });
 

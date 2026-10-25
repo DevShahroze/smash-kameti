@@ -102,6 +102,49 @@ async function buildSettlementContext() {
   };
 }
 
+/** Member/guest balances only — for dashboard (no transfer recomputation). */
+export async function getSettlementBalances() {
+  const settlementContext = await buildSettlementContext();
+
+  const [members, guests, allocations, transactions] = await Promise.all([
+    Member.find().lean(),
+    Guest.find().lean(),
+    ExpenseAllocation.find().lean(),
+    Transaction.find().lean(),
+  ]);
+
+  const participants = [
+    ...members.map((m) => ({
+      kind: PARTICIPANT_KIND.MEMBER,
+      id: m._id,
+      name: m.nickname || m.fullName,
+    })),
+    ...guests.map((g) => ({
+      kind: PARTICIPANT_KIND.GUEST,
+      id: g._id,
+      name: g.name,
+    })),
+  ];
+
+  const overallAllocations = filterAllocationsForScope(
+    allocations,
+    SETTLEMENT_SCOPE.OVERALL,
+    settlementContext,
+  );
+  const overallTransactions = filterTransactionsForScope(
+    transactions,
+    SETTLEMENT_SCOPE.OVERALL,
+    settlementContext,
+  );
+
+  const balanceMap = computeBalances({
+    allocations: overallAllocations,
+    transactions: overallTransactions,
+    participants,
+  });
+  return balancesToArray(balanceMap);
+}
+
 export async function getSettlementLedger(options = {}) {
   const { resync = false } = options;
   if (resync) {

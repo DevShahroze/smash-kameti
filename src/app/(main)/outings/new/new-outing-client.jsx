@@ -3,7 +3,19 @@
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api/client";
-import { OutingForm } from "@/components/outings/outing-form";
+import dynamic from "next/dynamic";
+
+const OutingForm = dynamic(
+  () =>
+    import("@/components/outings/outing-form").then((mod) => ({
+      default: mod.OutingForm,
+    })),
+  {
+    loading: () => (
+      <p className="text-sm text-muted-foreground">Loading form…</p>
+    ),
+  },
+);
 import { useAuth } from "@/components/providers/auth-provider";
 
 export default function NewOutingClient() {

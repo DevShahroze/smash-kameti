@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Money } from "@/components/money";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,45 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export function SettlementTransferTable({
+const TransferRow = memo(function TransferRow({
+  row,
+  idx,
+  scope,
+  showSettledCheckbox,
+  settlePending,
+  onRequestSettle,
+}) {
+  return (
+    <TableRow key={`${row.fromId}-${row.toId}-${row.amountPaisa}-${idx}`}>
+      <TableCell className="font-medium">{row.fromName}</TableCell>
+      <TableCell className="font-medium">{row.toName}</TableCell>
+      <TableCell className="text-right tabular-nums">
+        <Money paisa={row.amountPaisa} />
+      </TableCell>
+      {showSettledCheckbox ? (
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center gap-1.5">
+            <Checkbox
+              id={`settled-${scope}-${idx}`}
+              checked={false}
+              disabled={settlePending}
+              onCheckedChange={(checked) => {
+                if (checked === true) {
+                  onRequestSettle(row);
+                }
+              }}
+            />
+            <Label htmlFor={`settled-${scope}-${idx}`} className="sr-only">
+              Settled
+            </Label>
+          </div>
+        </TableCell>
+      ) : null}
+    </TableRow>
+  );
+});
+
+export const SettlementTransferTable = memo(function SettlementTransferTable({
   title,
   description,
   scope,
@@ -34,9 +72,11 @@ export function SettlementTransferTable({
 }) {
   const [confirmRow, setConfirmRow] = useState(null);
 
-  const visibleTransfers = showSettledCheckbox
-    ? transfers.filter((r) => !r.settled)
-    : transfers;
+  const visibleTransfers = useMemo(
+    () =>
+      showSettledCheckbox ? transfers.filter((r) => !r.settled) : transfers,
+    [showSettledCheckbox, transfers],
+  );
 
   function confirmSettled() {
     if (!confirmRow || !onSettledChange || !scope) {
@@ -77,37 +117,15 @@ export function SettlementTransferTable({
           </TableHeader>
           <TableBody>
             {visibleTransfers.map((row, idx) => (
-              <TableRow
+              <TransferRow
                 key={`${row.fromId}-${row.toId}-${row.amountPaisa}-${idx}`}
-              >
-                <TableCell className="font-medium">{row.fromName}</TableCell>
-                <TableCell className="font-medium">{row.toName}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  <Money paisa={row.amountPaisa} />
-                </TableCell>
-                {showSettledCheckbox ? (
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Checkbox
-                        id={`settled-${scope}-${idx}`}
-                        checked={false}
-                        disabled={settlePending}
-                        onCheckedChange={(checked) => {
-                          if (checked === true) {
-                            setConfirmRow(row);
-                          }
-                        }}
-                      />
-                      <Label
-                        htmlFor={`settled-${scope}-${idx}`}
-                        className="sr-only"
-                      >
-                        Settled
-                      </Label>
-                    </div>
-                  </TableCell>
-                ) : null}
-              </TableRow>
+                row={row}
+                idx={idx}
+                scope={scope}
+                showSettledCheckbox={showSettledCheckbox}
+                settlePending={settlePending}
+                onRequestSettle={setConfirmRow}
+              />
             ))}
           </TableBody>
         </Table>
@@ -150,4 +168,4 @@ export function SettlementTransferTable({
       </AlertDialog>
     </section>
   );
-}
+});

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { SettlementTransferTable } from "@/components/settlements/settlement-transfer-table";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ export default function SettlementsPage() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["settlements"],
+    queryKey: queryKeys.settlements,
     queryFn: () => apiFetch("/api/settlements"),
   });
 

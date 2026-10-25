@@ -1,15 +1,28 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
-import { OutingForm } from "@/components/outings/outing-form";
+import { queryKeys } from "@/lib/api/query-config";
 import { OutingReadOnly } from "@/components/outings/outing-read-only";
 import { useAuth } from "@/components/providers/auth-provider";
+
+const OutingForm = dynamic(
+  () =>
+    import("@/components/outings/outing-form").then((mod) => ({
+      default: mod.OutingForm,
+    })),
+  {
+    loading: () => (
+      <p className="text-sm text-muted-foreground">Loading form…</p>
+    ),
+  },
+);
 
 export default function EditOutingClient({ id }) {
   const { isAdmin } = useAuth();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["outing", id],
+    queryKey: queryKeys.outing(id),
     queryFn: () => apiFetch(`/api/outings/${id}`),
   });
 

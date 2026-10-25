@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -37,7 +38,7 @@ export default function OutingsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const { data: outings = [], isLoading, error } = useQuery({
-    queryKey: ["outings"],
+    queryKey: queryKeys.outings,
     queryFn: () => apiFetch("/api/outings"),
   });
 

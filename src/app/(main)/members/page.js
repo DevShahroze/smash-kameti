@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -30,11 +31,11 @@ export default function MembersPage() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { data: members = [], isLoading } = useQuery({
-    queryKey: ["members"],
+    queryKey: queryKeys.members,
     queryFn: () => apiFetch("/api/members"),
   });
   const { data: guests = [] } = useQuery({
-    queryKey: ["guests"],
+    queryKey: queryKeys.guests,
     queryFn: () => apiFetch("/api/guests"),
   });
 
@@ -47,7 +48,7 @@ export default function MembersPage() {
     mutationFn: (body) =>
       apiFetch("/api/members", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["members"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.members });
       setFullName("");
       setNickname("");
       setOpen(false);
@@ -63,7 +64,7 @@ export default function MembersPage() {
         body: JSON.stringify({ name: guestName }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["guests"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.guests });
       setGuestName("");
       toast.success("Guest added");
     },
@@ -77,7 +78,7 @@ export default function MembersPage() {
         body: JSON.stringify({ active }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["members"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.members });
     },
   });
 

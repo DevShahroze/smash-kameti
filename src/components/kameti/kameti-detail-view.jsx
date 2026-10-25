@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -31,7 +32,7 @@ export function KametiDetailView({ rotationId }) {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["kameti-rotation", rotationId],
+    queryKey: queryKeys.kametiRotation(rotationId),
     queryFn: () =>
       apiFetch(
         `/api/kameti/rotations/${rotationId}?include=turns`,
@@ -47,8 +48,10 @@ export function KametiDetailView({ rotationId }) {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["kameti-rotations"] });
-      queryClient.invalidateQueries({ queryKey: ["kameti-rotation", rotationId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.kametiRotations });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.kametiRotation(rotationId),
+      });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["settlements"] });
     },
@@ -63,7 +66,7 @@ export function KametiDetailView({ rotationId }) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["kameti-rotation", rotationId],
+        queryKey: queryKeys.kametiRotation(rotationId),
       });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["settlements"] });

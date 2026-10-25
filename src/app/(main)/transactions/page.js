@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-config";
 import { transactionPurpose } from "@/lib/transaction-display";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,11 +43,11 @@ export default function TransactionsPage() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { data: members = [] } = useQuery({
-    queryKey: ["members"],
+    queryKey: queryKeys.members,
     queryFn: () => apiFetch("/api/members"),
   });
   const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ["transactions"],
+    queryKey: queryKeys.transactions,
     queryFn: () => apiFetch("/api/transactions"),
   });
 

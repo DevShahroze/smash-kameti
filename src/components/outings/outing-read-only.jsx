@@ -1,9 +1,10 @@
 "use client";
 
+import { memo } from "react";
 import { format } from "date-fns";
 import { Money } from "@/components/money";
 
-export function OutingReadOnly({ outing }) {
+export const OutingReadOnly = memo(function OutingReadOnly({ outing }) {
   if (!outing) {
     return null;
   }
@@ -77,4 +78,4 @@ export function OutingReadOnly({ outing }) {
       ) : null}
     </dl>
   );
-}
+});
