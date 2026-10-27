@@ -78,7 +78,7 @@ export const SettlementsSummary = memo(function SettlementsSummary({
               <span>
                 {r.fromName} → {r.toName}
               </span>
-              <Money paisa={r.amountPaisa} />
+              <Money paisa={r.amountPaisa} whole />
             </li>
           ))}
           {compact && transfers.length > 4 && (

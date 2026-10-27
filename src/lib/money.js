@@ -16,18 +16,20 @@ export function rupeesFromPaisa(paisa) {
   return n / 100;
 }
 
-export function formatPKR(paisa) {
+export function formatPKR(paisa, options = {}) {
+  const { whole = false } = options;
   const rupees = rupeesFromPaisa(paisa);
   const formatted = new Intl.NumberFormat("en-PK", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: whole ? 0 : 2,
   }).format(rupees);
   return `${PKR_SYMBOL} ${formatted}`;
 }
 
 /**
- * Split totalPaisa equally among count participants.
- * Remainder paisa assigned deterministically to first keys in sorted order.
+ * Split totalPaisa equally among participants.
+ * Division uses ceil(total / count); surplus paisa is trimmed from the first
+ * keys in sorted order (same tie-break as the old floor + remainder pass).
  */
 export function splitEqually(totalPaisa, participantKeys) {
   const keys = [...participantKeys].sort();
@@ -35,14 +37,14 @@ export function splitEqually(totalPaisa, participantKeys) {
   if (count === 0) {
     return {};
   }
-  const base = Math.floor(totalPaisa / count);
-  let remainder = totalPaisa - base * count;
+  const base = Math.ceil(totalPaisa / count);
+  let surplus = base * count - totalPaisa;
   const result = {};
   for (const key of keys) {
     let share = base;
-    if (remainder > 0) {
-      share += 1;
-      remainder -= 1;
+    if (surplus > 0) {
+      share -= 1;
+      surplus -= 1;
     }
     result[key] = share;
   }

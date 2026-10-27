@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, Suspense } from "react";
+import { memo, Suspense, useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -56,12 +56,15 @@ export const TopNavbar = memo(function TopNavbar({
   onLogout,
   sidebarFooter,
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
   return (
     <header
       className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
     >
       <div className="flex h-11 items-center gap-2 px-3 md:px-4">
-        <Sheet>
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger
             className={cn(
               buttonVariants({ variant: "outline", size: "icon-sm" }),
@@ -78,10 +81,12 @@ export const TopNavbar = memo(function TopNavbar({
             </div>
             <div className="flex-1 overflow-y-auto">
               <Suspense fallback={null}>
-                <SidebarNav />
+                <SidebarNav onNavigate={closeMobileMenu} />
               </Suspense>
             </div>
-            {sidebarFooter}
+            {sidebarFooter ? (
+              <div onClick={closeMobileMenu}>{sidebarFooter}</div>
+            ) : null}
           </SheetContent>
         </Sheet>
 

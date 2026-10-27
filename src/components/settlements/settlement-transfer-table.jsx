@@ -48,7 +48,7 @@ const TransferRow = memo(function TransferRow({
       <TableCell
         className={cn(appTableCellClass, "text-right font-medium tabular-nums")}
       >
-        <Money paisa={row.amountPaisa} />
+        <Money paisa={row.amountPaisa} whole />
       </TableCell>
       {showSettledCheckbox ? (
         <TableCell className={cn(appTableCellClass, "text-center")}>
@@ -172,7 +172,7 @@ export const SettlementTransferTable = memo(function SettlementTransferTable({
                   <span className="font-medium text-foreground">
                     {confirmRow.toName}
                   </span>{" "}
-                  <Money paisa={confirmRow.amountPaisa} />. This records a
+                  <Money paisa={confirmRow.amountPaisa} whole />. This records a
                   member transfer and removes the row from this list.
                 </>
               ) : null}
