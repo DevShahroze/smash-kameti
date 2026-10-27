@@ -33,7 +33,7 @@ export function GuestManager() {
   });
 
   return (
-    <Card className="max-w-lg">
+    <Card className="home-stat-card max-w-lg">
       <CardHeader>
         <CardTitle className="text-base">Guests</CardTitle>
       </CardHeader>

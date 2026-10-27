@@ -9,7 +9,11 @@ import {
   useState,
 } from "react";
 
-const STORAGE_KEY = "smash-kameti-theme";
+import {
+  THEME_STORAGE_KEY,
+  persistThemeCookie,
+  resolveTheme,
+} from "@/components/theme/theme-storage";
 
 const ThemeContext = createContext(null);
 
@@ -18,34 +22,54 @@ function applyTheme(theme) {
   document.documentElement.classList.toggle("light", theme === "light");
 }
 
-function readStoredTheme() {
+function readLocalTheme(fallback) {
   if (typeof window === "undefined") {
-    return "dark";
+    return fallback;
   }
-  return localStorage.getItem(STORAGE_KEY) === "light" ? "light" : "dark";
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  return stored === "light" || stored === "dark"
+    ? stored
+    : resolveTheme(fallback);
 }
 
-export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState(readStoredTheme);
+function initClientTheme(serverTheme) {
+  const resolved = readLocalTheme(serverTheme);
+  if (typeof window !== "undefined") {
+    applyTheme(resolved);
+  }
+  return resolved;
+}
+
+export function ThemeProvider({ children, initialTheme = "dark" }) {
+  const [theme, setThemeState] = useState(() => initClientTheme(initialTheme));
 
   useEffect(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    persistThemeCookie(theme);
     applyTheme(theme);
   }, [theme]);
 
-  const setTheme = useCallback((next) => {
-    setThemeState(next);
-    localStorage.setItem(STORAGE_KEY, next);
+  const persistTheme = useCallback((next) => {
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+    persistThemeCookie(next);
     applyTheme(next);
   }, []);
+
+  const setTheme = useCallback(
+    (next) => {
+      setThemeState(next);
+      persistTheme(next);
+    },
+    [persistTheme],
+  );
 
   const toggleTheme = useCallback(() => {
     setThemeState((current) => {
       const next = current === "dark" ? "light" : "dark";
-      localStorage.setItem(STORAGE_KEY, next);
-      applyTheme(next);
+      persistTheme(next);
       return next;
     });
-  }, []);
+  }, [persistTheme]);
 
   const value = useMemo(
     () => ({ theme, setTheme, toggleTheme }),

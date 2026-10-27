@@ -72,7 +72,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Card size="sm" className="sm:col-span-2 lg:col-span-1">
+        <Card size="sm" className="home-stat-card sm:col-span-2 lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-sm">Kameti</CardTitle>
             <CardDescription className="text-xs">
@@ -154,7 +154,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card size="sm">
+        <Card size="sm" className="home-stat-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-1.5 text-sm">
               <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -188,13 +188,13 @@ export default function DashboardPage() {
                   {financial.unsettledCount === 1 ? "" : "s"} with open balances
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-md border px-2 py-1.5">
+                  <div className="rounded-md border bg-muted/40 px-2 py-1.5">
                     <p className="text-muted-foreground">To receive</p>
                     <p className="font-medium tabular-nums">
                       <Money paisa={financial.totalToReceivePaisa} />
                     </p>
                   </div>
-                  <div className="rounded-md border px-2 py-1.5">
+                  <div className="rounded-md border bg-muted/40 px-2 py-1.5">
                     <p className="text-muted-foreground">To pay</p>
                     <p className="font-medium tabular-nums">
                       <Money paisa={financial.totalToPayPaisa} />
@@ -206,7 +206,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card size="sm">
+        <Card size="sm" className="home-stat-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-1.5 text-sm">
               <Users className="h-4 w-4 text-muted-foreground" />

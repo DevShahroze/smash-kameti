@@ -3,7 +3,14 @@ import { jsonOk, jsonError } from "@/lib/api/http";
 import { TRANSACTION_TYPES } from "@/lib/constants";
 import Transaction from "@/models/Transaction";
 import Outing from "@/models/Outing";
-import { parseEnumParam, parseObjectId } from "@/lib/security/sanitize";
+import {
+  parseEnumParam,
+  parseObjectId,
+  parsePositiveIntParam,
+} from "@/lib/security/sanitize";
+
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
 
 export async function GET(request) {
   try {
@@ -27,9 +34,21 @@ export async function GET(request) {
       filter.outingId = outingId;
     }
 
-    const transactions = await Transaction.find(filter)
-      .sort({ transactionDate: -1 })
-      .lean();
+    const page = parsePositiveIntParam(searchParams.get("page"), "page") ?? 1;
+    const pageSizeRaw =
+      parsePositiveIntParam(searchParams.get("pageSize"), "pageSize") ??
+      DEFAULT_PAGE_SIZE;
+    const pageSize = Math.min(pageSizeRaw, MAX_PAGE_SIZE);
+    const skip = (page - 1) * pageSize;
+
+    const [total, transactions] = await Promise.all([
+      Transaction.countDocuments(filter),
+      Transaction.find(filter)
+        .sort({ transactionDate: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+    ]);
 
     const outingIds = [
       ...new Set(
@@ -55,7 +74,15 @@ export async function GET(request) {
         : null,
     }));
 
-    return jsonOk(enriched);
+    const pageCount = total === 0 ? 1 : Math.ceil(total / pageSize);
+
+    return jsonOk({
+      items: enriched,
+      total,
+      page,
+      pageSize,
+      pageCount,
+    });
   } catch (err) {
     if (err?.message?.startsWith("Invalid ")) {
       return jsonError(err.message, 400);

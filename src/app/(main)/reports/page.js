@@ -3,6 +3,7 @@
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/page-header";
 
 const exports = [
   { type: "outings", label: "Outings" },
@@ -13,14 +14,14 @@ const exports = [
 
 export default function ReportsPage() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Reports</h1>
-      <p className="text-sm text-muted-foreground">
-        Export CSV snapshots for auditing. Use outings list filters in the app for interactive history.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2">
+    <div className="space-y-5">
+      <PageHeader
+        title="Reports"
+        description="CSV exports for auditing — outings list in the app for day-to-day history."
+      />
+      <div className="grid gap-3 sm:grid-cols-2">
         {exports.map((item) => (
-          <Card key={item.type}>
+          <Card key={item.type} className="home-stat-card">
             <CardHeader>
               <CardTitle className="text-base">{item.label}</CardTitle>
             </CardHeader>

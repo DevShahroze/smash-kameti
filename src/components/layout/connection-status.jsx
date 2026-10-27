@@ -21,7 +21,7 @@ export function ConnectionStatus() {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+        "inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium leading-none",
         online
           ? "border-emerald-500/35 text-emerald-700 dark:text-emerald-400"
           : "border-amber-500/45 text-amber-800 dark:text-amber-400",
@@ -35,7 +35,7 @@ export function ConnectionStatus() {
     >
       <span
         className={cn(
-          "h-1.5 w-1.5 shrink-0 rounded-full",
+          "size-2 shrink-0 rounded-full",
           online ? "bg-emerald-500" : "bg-amber-500",
         )}
         aria-hidden

@@ -50,7 +50,7 @@ export const SettlementsSummary = memo(function SettlementsSummary({
   return (
     <section
       className={cn(
-        "space-y-2 rounded-lg border bg-card p-3 text-sm",
+        "app-panel space-y-2 p-3 text-sm ring-1 ring-foreground/10",
         className,
       )}
     >

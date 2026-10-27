@@ -22,6 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import {
+  appTableCellClass,
+  appTableHeadClass,
+  appTableHeadRowClass,
+} from "@/components/layout/app-panel";
 
 const TransferRow = memo(function TransferRow({
   row,
@@ -33,13 +39,19 @@ const TransferRow = memo(function TransferRow({
 }) {
   return (
     <TableRow key={`${row.fromId}-${row.toId}-${row.amountPaisa}-${idx}`}>
-      <TableCell className="font-medium">{row.fromName}</TableCell>
-      <TableCell className="font-medium">{row.toName}</TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className={cn(appTableCellClass, "font-medium")}>
+        {row.fromName}
+      </TableCell>
+      <TableCell className={cn(appTableCellClass, "font-medium")}>
+        {row.toName}
+      </TableCell>
+      <TableCell
+        className={cn(appTableCellClass, "text-right font-medium tabular-nums")}
+      >
         <Money paisa={row.amountPaisa} />
       </TableCell>
       {showSettledCheckbox ? (
-        <TableCell className="text-center">
+        <TableCell className={cn(appTableCellClass, "text-center")}>
           <div className="flex items-center justify-center gap-1.5">
             <Checkbox
               id={`settled-${scope}-${idx}`}
@@ -94,9 +106,9 @@ export const SettlementTransferTable = memo(function SettlementTransferTable({
   }
 
   return (
-    <section className="space-y-2 rounded-lg border p-4">
+    <section className="app-panel space-y-3 overflow-hidden p-4 ring-1 ring-foreground/10">
       <div>
-        <h2 className="font-medium">{title}</h2>
+        <h2 className="text-sm font-medium">{title}</h2>
         {description ? (
           <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         ) : null}
@@ -106,12 +118,20 @@ export const SettlementTransferTable = memo(function SettlementTransferTable({
       ) : (
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Person who pays</TableHead>
-              <TableHead>Person who receives</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+            <TableRow className={appTableHeadRowClass}>
+              <TableHead className={appTableHeadClass}>
+                Person who pays
+              </TableHead>
+              <TableHead className={appTableHeadClass}>
+                Person who receives
+              </TableHead>
+              <TableHead className={cn(appTableHeadClass, "text-right")}>
+                Amount
+              </TableHead>
               {showSettledCheckbox ? (
-                <TableHead className="w-24 text-center">Settled</TableHead>
+                <TableHead className={cn(appTableHeadClass, "w-24 text-center")}>
+                  Settled
+                </TableHead>
               ) : null}
             </TableRow>
           </TableHeader>

@@ -10,6 +10,7 @@ import {
 import { SettlementTransferTable } from "@/components/settlements/settlement-transfer-table";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default function SettlementsPage() {
   const { isAdmin } = useAuth();
@@ -34,28 +35,35 @@ export default function SettlementsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  if (isLoading) {
-    return <p className="text-muted-foreground">Loading…</p>;
-  }
-  if (error) {
-    return <p className="text-destructive">{error.message}</p>;
-  }
-
-  const kametiTransfers = data.kameti?.transfers || [];
-  const americanTransfers = data.american?.transfers || [];
-  const overallTransfers = data.overall?.transfers || data.recommendations || [];
+  const kametiTransfers = data?.kameti?.transfers || [];
+  const americanTransfers = data?.american?.transfers || [];
+  const overallTransfers =
+    data?.overall?.transfers || data?.recommendations || [];
+  const openCount =
+    kametiTransfers.filter((r) => !r.settled).length +
+    americanTransfers.filter((r) => !r.settled).length;
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-medium">Settlements</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {isAdmin
-            ? "Check Settled on Kameti/American rows when paid (admin only). Overall is read-only."
-            : "Who owes whom — view only. Admin login required to mark settled or record payments."}
-        </p>
-      </div>
+      <PageHeader
+        title="Settlements"
+        description={
+          isLoading
+            ? "Loading balances…"
+            : error
+              ? "Could not load settlements"
+              : isAdmin
+                ? `${openCount} open Kameti/American row${openCount === 1 ? "" : "s"} · mark Settled when paid`
+                : `${openCount} open row${openCount === 1 ? "" : "s"} · view only`
+        }
+      />
 
+      {error ? (
+        <p className="text-sm text-destructive">{error.message}</p>
+      ) : isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <>
       <SettlementTransferTable
         scope="kameti"
         title="Kameti settlement"
@@ -85,6 +93,8 @@ export default function SettlementsPage() {
         description="All Kameti and American expenses plus completed member-to-member transfers."
         transfers={overallTransfers}
       />
+        </>
+      )}
     </div>
   );
 }

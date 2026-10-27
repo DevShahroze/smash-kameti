@@ -1,7 +1,11 @@
 import { Inter } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/theme-provider";
-import { ThemeInitScript } from "@/components/theme/theme-init-script";
+import {
+  THEME_STORAGE_KEY,
+  resolveTheme,
+} from "@/components/theme/theme-storage";
 
 const inter = Inter({
   variable: "--font-app-sans",
@@ -14,21 +18,23 @@ export const metadata = {
   description: "Kameti turns, American splits, and group settlements",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const cookieStore = await cookies();
+  const initialTheme = resolveTheme(
+    cookieStore.get(THEME_STORAGE_KEY)?.value,
+  );
+
   return (
     <html
       lang="en"
-      className={`${inter.variable} dark h-full`}
+      className={`${inter.variable} ${initialTheme} h-full`}
       suppressHydrationWarning
     >
-      <head>
-        <ThemeInitScript />
-      </head>
       <body
         className="min-h-full flex flex-col bg-background text-sm leading-snug text-foreground antialiased"
         suppressHydrationWarning
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider initialTheme={initialTheme}>{children}</ThemeProvider>
       </body>
     </html>
   );

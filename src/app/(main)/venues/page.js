@@ -18,6 +18,14 @@ import {
 import { Money } from "@/components/money";
 import { toast } from "sonner";
 import { AdminOnly } from "@/components/auth/admin-only";
+import { PageHeader } from "@/components/layout/page-header";
+import {
+  AppPanel,
+  appTableCellClass,
+  appTableHeadClass,
+  appTableHeadRowClass,
+} from "@/components/layout/app-panel";
+import { cn } from "@/lib/utils";
 
 export default function VenuesPage() {
   const queryClient = useQueryClient();
@@ -42,47 +50,72 @@ export default function VenuesPage() {
   });
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-medium">Venues</h1>
+    <div className="space-y-5">
+      <PageHeader
+        title="Venues"
+        description={
+          isLoading
+            ? "Loading venues…"
+            : `${venues.length} restaurant${venues.length === 1 ? "" : "s"}`
+        }
+      />
+
       <AdminOnly>
-        <div className="flex flex-wrap gap-2">
-          <Input
-            className="max-w-xs"
-            placeholder="Restaurant name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!name.trim()}
-            onClick={() => createMutation.mutate()}
-          >
-            Add
-          </Button>
-        </div>
+        <AppPanel className="space-y-3 p-4">
+          <p className="text-xs text-muted-foreground">Add a venue for outings.</p>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              className="max-w-xs"
+              placeholder="Restaurant name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!name.trim()}
+              onClick={() => createMutation.mutate()}
+            >
+              Add
+            </Button>
+          </div>
+        </AppPanel>
       </AdminOnly>
-      {isLoading && <p className="text-muted-foreground">Loading…</p>}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Visits</TableHead>
-            <TableHead>Avg bill</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {venues.map((v) => (
-            <TableRow key={v._id}>
-              <TableCell>{v.name}</TableCell>
-              <TableCell>{v.stats?.visitCount || 0}</TableCell>
-              <TableCell>
-                <Money paisa={v.stats?.averageBillPaisa || 0} />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+
+      <AppPanel>
+        {isLoading ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+            Loading…
+          </p>
+        ) : venues.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+            No venues yet.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className={appTableHeadRowClass}>
+                <TableHead className={appTableHeadClass}>Name</TableHead>
+                <TableHead className={appTableHeadClass}>Visits</TableHead>
+                <TableHead className={appTableHeadClass}>Avg bill</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {venues.map((v) => (
+                <TableRow key={v._id}>
+                  <TableCell className={appTableCellClass}>{v.name}</TableCell>
+                  <TableCell className={cn(appTableCellClass, "tabular-nums")}>
+                    {v.stats?.visitCount || 0}
+                  </TableCell>
+                  <TableCell className={cn(appTableCellClass, "tabular-nums")}>
+                    <Money paisa={v.stats?.averageBillPaisa || 0} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </AppPanel>
     </div>
   );
 }

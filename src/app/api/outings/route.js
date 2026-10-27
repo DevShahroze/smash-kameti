@@ -10,6 +10,9 @@ import {
   parsePositiveIntParam,
 } from "@/lib/security/sanitize";
 
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
+
 export async function GET(request) {
   try {
     await connectDB();
@@ -51,10 +54,31 @@ export async function GET(request) {
       ];
     }
 
-    const outings = await Outing.find(filter)
-      .sort({ weekNumber: -1, actualDate: -1 })
-      .lean();
-    return jsonOk(outings);
+    const page = parsePositiveIntParam(searchParams.get("page"), "page") ?? 1;
+    const pageSizeRaw =
+      parsePositiveIntParam(searchParams.get("pageSize"), "pageSize") ??
+      DEFAULT_PAGE_SIZE;
+    const pageSize = Math.min(pageSizeRaw, MAX_PAGE_SIZE);
+    const skip = (page - 1) * pageSize;
+
+    const [total, outings] = await Promise.all([
+      Outing.countDocuments(filter),
+      Outing.find(filter)
+        .sort({ weekNumber: -1, actualDate: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+    ]);
+
+    const pageCount = total === 0 ? 1 : Math.ceil(total / pageSize);
+
+    return jsonOk({
+      items: outings,
+      total,
+      page,
+      pageSize,
+      pageCount,
+    });
   } catch (err) {
     if (err?.message?.startsWith("Invalid ")) {
       return jsonError(err.message, 400);

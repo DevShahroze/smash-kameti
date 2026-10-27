@@ -26,6 +26,14 @@ import {
 import { toast } from "sonner";
 import { AdminOnly } from "@/components/auth/admin-only";
 import { useAuth } from "@/components/providers/auth-provider";
+import { PageHeader } from "@/components/layout/page-header";
+import {
+  AppPanel,
+  appTableCellClass,
+  appTableHeadClass,
+  appTableHeadRowClass,
+} from "@/components/layout/app-panel";
+import { Badge } from "@/components/ui/badge";
 
 export default function MembersPage() {
   const { isAdmin } = useAuth();
@@ -82,10 +90,18 @@ export default function MembersPage() {
     },
   });
 
+  const activeCount = members.filter((m) => m.active).length;
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-medium">Members</h1>
+      <PageHeader
+        title="Members"
+        description={
+          isLoading
+            ? "Loading roster…"
+            : `${activeCount} active · ${members.length} total · ${guests.length} guest${guests.length === 1 ? "" : "s"}`
+        }
+      >
         <AdminOnly>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger className={cn(buttonVariants({ size: "sm" }))}>
@@ -116,47 +132,71 @@ export default function MembersPage() {
           </DialogContent>
         </Dialog>
         </AdminOnly>
-      </div>
+      </PageHeader>
 
-      {isLoading && <p className="text-muted-foreground">Loading…</p>}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Nickname</TableHead>
-            <TableHead>Status</TableHead>
-            {isAdmin ? <TableHead /> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {members.map((m) => (
-            <TableRow key={m._id}>
-              <TableCell>{m.fullName}</TableCell>
-              <TableCell>{m.nickname || "—"}</TableCell>
-              <TableCell>{m.active ? "Active" : "Inactive"}</TableCell>
-              {isAdmin ? (
-                <TableCell className="text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      toggleMutation.mutate({ id: m._id, active: !m.active })
-                    }
-                  >
-                    {m.active ? "Deactivate" : "Activate"}
-                  </Button>
-                </TableCell>
-              ) : null}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <AppPanel>
+        {isLoading ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+            Loading…
+          </p>
+        ) : members.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+            No members yet.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className={appTableHeadRowClass}>
+                <TableHead className={appTableHeadClass}>Name</TableHead>
+                <TableHead className={appTableHeadClass}>Nickname</TableHead>
+                <TableHead className={appTableHeadClass}>Status</TableHead>
+                {isAdmin ? (
+                  <TableHead className={cn(appTableHeadClass, "text-right")} />
+                ) : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {members.map((m) => (
+                <TableRow key={m._id}>
+                  <TableCell className={appTableCellClass}>{m.fullName}</TableCell>
+                  <TableCell className={appTableCellClass}>
+                    {m.nickname || "—"}
+                  </TableCell>
+                  <TableCell className={appTableCellClass}>
+                    <Badge
+                      variant={m.active ? "secondary" : "outline"}
+                      className="font-normal"
+                    >
+                      {m.active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  {isAdmin ? (
+                    <TableCell className={cn(appTableCellClass, "text-right")}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          toggleMutation.mutate({ id: m._id, active: !m.active })
+                        }
+                      >
+                        {m.active ? "Deactivate" : "Activate"}
+                      </Button>
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </AppPanel>
 
-      <section className="space-y-3">
-        <h2 className="font-medium">Guests</h2>
-        <p className="text-sm text-muted-foreground">
-          Guests can join outings; assign them on the outing form.
-        </p>
+      <AppPanel className="space-y-3 p-4">
+        <div>
+          <h2 className="text-sm font-medium">Guests</h2>
+          <p className="text-xs text-muted-foreground">
+            Guests can join outings; assign them on the outing form.
+          </p>
+        </div>
         <AdminOnly>
           <div className="flex flex-wrap gap-2">
             <Input
@@ -175,12 +215,14 @@ export default function MembersPage() {
             </Button>
           </div>
         </AdminOnly>
-        {guests.length > 0 && (
+        {guests.length > 0 ? (
           <p className="text-sm text-muted-foreground">
             {guests.map((g) => g.name).join(", ")}
           </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">No guests yet.</p>
         )}
-      </section>
+      </AppPanel>
     </div>
   );
 }

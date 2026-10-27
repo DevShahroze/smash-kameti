@@ -7,6 +7,7 @@ import { ACCOUNTING_MODE_LABELS } from "@/lib/select-display";
 import { GuestManager } from "./guest-manager";
 import { SettingsEditor } from "./settings-editor";
 import { useAuth } from "@/components/providers/auth-provider";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default function SettingsPage() {
   const { isAdmin } = useAuth();
@@ -16,9 +17,12 @@ export default function SettingsPage() {
   });
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Settings</h1>
-      <Card className="max-w-lg">
+    <div className="space-y-5">
+      <PageHeader
+        title="Settings"
+        description="Group name, accounting mode, and guests."
+      />
+      <Card className="home-stat-card max-w-lg">
         <CardHeader>
           <CardTitle className="text-base">Group & accounting</CardTitle>
         </CardHeader>
