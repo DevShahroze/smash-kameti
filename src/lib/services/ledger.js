@@ -5,7 +5,11 @@ import KametiTurn from "@/models/KametiTurn";
 import KametiRotation from "@/models/KametiRotation";
 import ExpenseAllocation from "@/models/ExpenseAllocation";
 import Transaction from "@/models/Transaction";
-import { OUTING_STATUS, PARTICIPANT_KIND } from "@/lib/constants";
+import {
+  OUTING_STATUS,
+  PARTICIPANT_KIND,
+  PAYMENT_SYSTEMS,
+} from "@/lib/constants";
 import { syncOutingFinancials } from "@/lib/accounting/outing-ledger";
 import {
   computeBalances,
@@ -66,7 +70,9 @@ export async function resyncOutingsForKametiRotation(rotationId) {
 async function buildSettlementContext() {
   const [outings, turns, rotations] = await Promise.all([
     Outing.find()
-      .select("_id paymentSystem kametiTurnId settlementsIncluded hostMemberId")
+      .select(
+        "_id paymentSystem kametiTurnId settlementsIncluded hostMemberId sharedBillPaisa parcels",
+      )
       .lean(),
     KametiTurn.find().select("_id rotationId outingId").lean(),
     KametiRotation.find().select("_id settlementsIncluded").lean(),
@@ -113,12 +119,28 @@ async function buildSettlementContext() {
     ]),
   );
 
+  const kametiTreatPaisaByOutingId = new Map();
+  for (const o of outings) {
+    if (o.paymentSystem !== PAYMENT_SYSTEMS.KAMETI) {
+      continue;
+    }
+    const parcelSum = (o.parcels || []).reduce(
+      (sum, p) => sum + (p.amountPaisa || 0),
+      0,
+    );
+    kametiTreatPaisaByOutingId.set(
+      String(o._id),
+      Math.max(0, (o.sharedBillPaisa || 0) - parcelSum),
+    );
+  }
+
   return {
     outingPaymentById,
     outingRotationByOutingId,
     settlementsIncludedByRotationId,
     settlementsIncludedByOutingId,
     outingHostByOutingId,
+    kametiTreatPaisaByOutingId,
   };
 }
 

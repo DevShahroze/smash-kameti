@@ -1,7 +1,10 @@
 "use client";
 
 import { memo, useMemo, useState } from "react";
+import { Copy } from "lucide-react";
+import { toast } from "sonner";
 import { Money } from "@/components/money";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatPKR } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
   appTableCellClass,
@@ -90,6 +94,28 @@ export const SettlementTransferTable = memo(function SettlementTransferTable({
     [showSettledCheckbox, transfers],
   );
 
+  async function copyTable() {
+    const text =
+      visibleTransfers.length === 0
+        ? "Everyone is settled."
+        : [
+            ["Person who pays", "Person who receives", "Amount"].join("\t"),
+            ...visibleTransfers.map((row) =>
+              [
+                row.fromName,
+                row.toName,
+                formatPKR(row.amountPaisa, { whole: true }),
+              ].join("\t"),
+            ),
+          ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Table copied");
+    } catch (e) {
+      toast.error(e.message);
+    }
+  }
+
   function confirmSettled() {
     if (!confirmRow || !onSettledChange || !scope) {
       setConfirmRow(null);
@@ -107,11 +133,22 @@ export const SettlementTransferTable = memo(function SettlementTransferTable({
 
   return (
     <section className="app-panel space-y-3 overflow-hidden p-4 ring-1 ring-foreground/10">
-      <div>
-        <h2 className="text-sm font-medium">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-        ) : null}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-medium">{title}</h2>
+          {description ? (
+            <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+          ) : null}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Copy ${title} table`}
+          onClick={copyTable}
+        >
+          <Copy />
+        </Button>
       </div>
       {visibleTransfers.length === 0 ? (
         <p className="text-sm text-muted-foreground">Everyone is settled.</p>

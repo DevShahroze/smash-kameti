@@ -27,6 +27,8 @@ import {
   appTableHeadRowClass,
 } from "@/components/layout/app-panel";
 import { Badge } from "@/components/ui/badge";
+import { CopyTableButton } from "@/components/kameti/copy-table-button";
+import { rotationStartedOn } from "@/lib/kameti-display";
 
 export default function KametiListPage() {
   const router = useRouter();
@@ -81,6 +83,11 @@ export default function KametiListPage() {
                 <TableHead className={cn(appTableHeadClass, "text-right")}>
                   Members
                 </TableHead>
+                <TableHead
+                  className={cn(appTableHeadClass, "w-12 text-center")}
+                >
+                  <span className="sr-only">Copy</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -128,6 +135,23 @@ export default function KametiListPage() {
                       className={cn(appTableCellClass, "text-right tabular-nums")}
                     >
                       {r.memberIds?.length ?? "—"}
+                    </TableCell>
+                    <TableCell
+                      className={cn(appTableCellClass, "text-center")}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <CopyTableButton
+                        stopRowClick
+                        ariaLabel={`Copy ${rotationTitle(r)} row`}
+                        headers={["Name", "Started", "Members"]}
+                        rows={[
+                          [
+                            rotationTitle(r),
+                            rotationStartedOn(r),
+                            String(r.memberIds?.length ?? "—"),
+                          ],
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 );

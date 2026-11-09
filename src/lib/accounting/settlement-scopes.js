@@ -94,6 +94,43 @@ export function filterAllocationsForScope(allocations, scope, settlementContext)
   });
 }
 
+function kametiScopeTreatPaymentAmount(tx, settlementContext) {
+  if (!tx.outingId || tx.type !== TRANSACTION_TYPES.RESTAURANT_BILL) {
+    return tx.amountPaisa;
+  }
+  if (isParcelOutingSyncTransaction(tx) || tx.notes !== "Shared bill") {
+    return tx.amountPaisa;
+  }
+  const system = paymentSystemForOuting(
+    tx.outingId,
+    settlementContext.outingPaymentById,
+  );
+  if (system !== PAYMENT_SYSTEMS.KAMETI) {
+    return tx.amountPaisa;
+  }
+  const treat = settlementContext.kametiTreatPaisaByOutingId?.get(
+    String(tx.outingId),
+  );
+  if (treat === undefined) {
+    return tx.amountPaisa;
+  }
+  return treat;
+}
+
+/** Kameti scope: host shared-bill credit is treat-only (total bill minus parcels). */
+export function applyScopeToTransactions(transactions, scope, settlementContext) {
+  if (scope !== SETTLEMENT_SCOPE.KAMETI) {
+    return transactions;
+  }
+  return transactions.map((t) => {
+    const amountPaisa = kametiScopeTreatPaymentAmount(t, settlementContext);
+    if (amountPaisa === t.amountPaisa) {
+      return t;
+    }
+    return { ...t, amountPaisa };
+  });
+}
+
 export function filterTransactionsForScope(transactions, scope, settlementContext) {
   return transactions.filter((t) => {
     if (!t.affectsSettlement) {
@@ -145,8 +182,8 @@ export function computeSettlementTransfers({
     scope,
     settlementContext,
   );
-  const scopedTransactions = filterTransactionsForScope(
-    transactions,
+  const scopedTransactions = applyScopeToTransactions(
+    filterTransactionsForScope(transactions, scope, settlementContext),
     scope,
     settlementContext,
   );

@@ -27,25 +27,45 @@ import { SettlementsSummary } from "@/components/settlements/settlements-summary
 import { AdminOnly } from "@/components/auth/admin-only";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Money } from "@/components/money";
+import { formatPKR } from "@/lib/money";
+import { CopyTableButton } from "@/components/kameti/copy-table-button";
 
 function KametiPerMemberPay({
   rows,
   payersCount,
   treatSharePerMemberPaisa,
+  copyLabel = "Copy per-person table",
 }) {
+  const headers = ["Person", "Treat share", "Parcel", "Total"];
+  const tableRows = rows.map((row) => [
+    row.name,
+    row.treatSharePaisa > 0
+      ? formatPKR(row.treatSharePaisa, { whole: true })
+      : "No treat share",
+    row.parcelPaisa > 0 ? formatPKR(row.parcelPaisa, { whole: true }) : "—",
+    formatPKR(row.totalPayPaisa || 0, { whole: true }),
+  ]);
+
   return (
     <div className="mt-3 space-y-1 rounded-md border bg-background/80 p-2 text-xs">
-      <p className="font-medium">
-        What each person pays
-        {payersCount > 0 ? (
-          <span className="font-normal text-muted-foreground">
-            {" "}
-            (treat{" "}
-            <Money paisa={treatSharePerMemberPaisa} className="inline" /> each
-            for {payersCount} with Pays share)
-          </span>
-        ) : null}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium">
+          What each person pays
+          {payersCount > 0 ? (
+            <span className="font-normal text-muted-foreground">
+              {" "}
+              (treat{" "}
+              <Money paisa={treatSharePerMemberPaisa} className="inline" /> each
+              for {payersCount} with Pays share)
+            </span>
+          ) : null}
+        </p>
+        <CopyTableButton
+          ariaLabel={copyLabel}
+          headers={headers}
+          rows={tableRows}
+        />
+      </div>
       <ul className="divide-y">
         {rows.map((row) => (
           <li
@@ -159,6 +179,33 @@ export function KametiDetailView({ rotationId }) {
     (sum, t) => sum + (t.treatAmountPaisa || 0),
     0,
   );
+
+  const turnHeaders = [
+    "#",
+    "Member",
+    "Status",
+    "Total paid",
+    "Kameti split",
+    "Each pays (treat)",
+    "Payers",
+  ];
+  const turnRows = turns.map((t) => [
+    String(t.turnNumber),
+    t.memberNameSnapshot || "",
+    t.status || "",
+    formatPKR(t.totalBillPaisa || 0, { whole: true }),
+    formatPKR(t.treatAmountPaisa || 0, { whole: true }),
+    t.payersCount > 0
+      ? formatPKR(t.treatSharePerMemberPaisa || 0, { whole: true })
+      : "—",
+    t.payersCount > 0 ? String(t.payersCount) : "—",
+  ]);
+  const rotationOrderHeaders = ["#", "Member", "Status"];
+  const rotationOrderRows = turns.map((t) => [
+    String(t.turnNumber),
+    t.memberNameSnapshot || "",
+    t.status || "",
+  ]);
 
   return (
     <div className="space-y-4">
@@ -302,6 +349,7 @@ export function KametiDetailView({ rotationId }) {
                   rows={pending[0].perMemberPay}
                   payersCount={pending[0].payersCount}
                   treatSharePerMemberPaisa={pending[0].treatSharePerMemberPaisa}
+                  copyLabel="Copy current turn per-person table"
                 />
               ) : null}
             </div>
@@ -313,7 +361,14 @@ export function KametiDetailView({ rotationId }) {
 
           {turns.length > 0 && (
             <section className="space-y-2">
-              <h2 className="text-sm font-medium">Rotation order</h2>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium">Rotation order</h2>
+                <CopyTableButton
+                  ariaLabel="Copy rotation order table"
+                  headers={rotationOrderHeaders}
+                  rows={rotationOrderRows}
+                />
+              </div>
               <ol className="grid gap-1 sm:grid-cols-2">
                 {turns.map((t) => (
                   <li
@@ -340,7 +395,16 @@ export function KametiDetailView({ rotationId }) {
           )}
 
           <section className="space-y-2 rounded-lg border p-3">
-            <h2 className="text-sm font-medium">Turns</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium">Turns</h2>
+              {turns.length > 0 ? (
+                <CopyTableButton
+                  ariaLabel="Copy turns table"
+                  headers={turnHeaders}
+                  rows={turnRows}
+                />
+              ) : null}
+            </div>
             {turns.length === 0 ? (
               <p className="text-xs text-muted-foreground">No turns.</p>
             ) : (
@@ -454,6 +518,7 @@ export function KametiDetailView({ rotationId }) {
                         rows={t.perMemberPay}
                         payersCount={t.payersCount}
                         treatSharePerMemberPaisa={t.treatSharePerMemberPaisa}
+                        copyLabel={`Copy week ${t.turnNumber} per-person table`}
                       />
                     </div>
                   ))}

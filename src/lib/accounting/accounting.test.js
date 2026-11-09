@@ -5,6 +5,7 @@ import {
   buildKametiAllocations,
 } from "@/lib/accounting/american";
 import {
+  applyScopeToTransactions,
   computeSettlementTransfers,
   filterAllocationsForScope,
   filterTransactionsForScope,
@@ -543,6 +544,9 @@ describe("balances and settlements", () => {
       settlementsIncludedByRotationId: new Map([["rot-k", true]]),
       settlementsIncludedByOutingId: new Map([["o-k", true]]),
       outingHostByOutingId: new Map([["o-k", "host"]]),
+      kametiTreatPaisaByOutingId: new Map([
+        ["o-k", paisaFromRupees(8000)],
+      ]),
     };
     const allocations = buildKametiAllocations({
       outingId: "o-k",
@@ -622,5 +626,43 @@ describe("balances and settlements", () => {
       }),
     );
     expect(sumNetBalances(overallRows)).toBe(0);
+
+    const kametiScopedTx = applyScopeToTransactions(
+      filterTransactionsForScope(
+        transactions,
+        SETTLEMENT_SCOPE.KAMETI,
+        settlementContext,
+      ),
+      SETTLEMENT_SCOPE.KAMETI,
+      settlementContext,
+    );
+    const kametiRows = balancesToArray(
+      computeBalances({
+        allocations: filterAllocationsForScope(
+          allocations,
+          SETTLEMENT_SCOPE.KAMETI,
+          settlementContext,
+        ),
+        transactions: kametiScopedTx,
+        participants,
+      }),
+    );
+    expect(sumNetBalances(kametiRows.filter((r) => r.kind === "member"))).toBe(
+      0,
+    );
+    const kameti = computeSettlementTransfers({
+      scope: SETTLEMENT_SCOPE.KAMETI,
+      allocations,
+      transactions,
+      participants,
+      settlementContext,
+    });
+    expect(kameti).toEqual([
+      expect.objectContaining({
+        fromName: "Ahmed",
+        toName: "Host",
+        amountPaisa: paisaFromRupees(4000),
+      }),
+    ]);
   });
 });

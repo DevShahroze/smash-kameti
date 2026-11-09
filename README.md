@@ -75,6 +75,7 @@ Multi-document sync (outing financial rebuild) supports MongoDB replica sets. On
 - **Settled (Kameti & American only):** Checkbox + confirmation records the payment as a member transfer and removes that row from the scope table.
 - **Transfers:** Member-to-member payments on **Transactions** reduce overall balances; they are not restaurant expenses.
 - **Recommendations:** Greedy minimum transfers (e.g. Ahmed pays Ali Rs 2,000; Bilal pays Ali Rs 1,000) from current net balances. Rows are **netting** across **all** completed Kameti bills in the rotation, not one row per night per person.
+- **Copy tables:** Each scope card (Kameti / American / Overall) has a copy icon that exports the transfer table as tab-separated text for paste into Excel or Sheets.
 - **“Total” on the Kameti table:** The sum of all **transfer line amounts** is **not** total restaurant spend or total Kameti split. It is only how much cash the matcher routes through listed payers. That sum **can go up or down** when you change **Pays share** on one bill (see below) even though treat totals in the ledger do not.
 - **During Kameti:** You do not need to wait for the rotation to finish. **Settlements** and the Kameti pages show live balances from American outings, parcels, and transfers while turns are still in progress. Opening **Settlements** rebuilds the ledger from saved completed outings (no separate admin sync step).
 - **Whole Kameti settled:** On a rotation page, **Mark Kameti settled** sets `settlementsIncluded` to false for that rotation. All bills linked to its turns drop out of **Kameti**, **American**, and **Overall** settlement math; synced ledger rows for those bills are cleared. Use **Include in settlements again** to reopen. Single outings can still be excluded via the outing form checkbox.
@@ -100,7 +101,7 @@ Multi-document sync (outing financial rebuild) supports MongoDB replica sets. On
 | **Outings list — Kameti split** | Kameti only: total − parcels; American outings show — |
 | **Paid by (settlement)** on parcels | Who advanced cash for that parcel; defaults to the **turn host** on new parcel rows |
 
-Ledger sync: `buildKametiAllocations` splits **Kameti split** only; parcel rows use American-style personal allocations. Parcel settlement scope is **American** (and **Overall**), not the Kameti treat table.
+Ledger sync: `buildKametiAllocations` splits **Kameti split** only; parcel rows use American-style personal allocations. Parcel settlement scope is **American** (and **Overall**), not the Kameti treat table. On the **Kameti** settlements scope, host **Shared bill** credits count **treat only** (total bill paid minus parcels), so treat rows and transfer suggestions stay in sync.
 
 ### Worked example (8 members)
 
@@ -161,6 +162,8 @@ Weeks 1 and 2 are unchanged. Each remaining payer’s **total treat debt** goes 
 
 **Kameti rotation page:** For each saved bill, **What each person pays** shows treat share, personal parcel (if any), and total for that night using the same rules as the ledger.
 
+**Kameti copy (rotation page `/kameti/[id]`):** Copy icons on the Kameti list, rotation order, **Turns** table, and each per-person block copy tab-separated text for Excel/Sheets. **Settlements** tables have the same copy pattern per scope (Kameti / American / Overall).
+
 After editing a bill, **Save bill**; then open **Settlements** or **Kameti** again (client cache is invalidated on save). To verify ledger math against MongoDB: `npm test -- src/lib/accounting/verify-db-ledger.test.js` (requires `MONGODB_URI`).
 
 ## API & backend security
@@ -208,15 +211,15 @@ npm run check   # lint + test + build
 
 | Goal | Where |
 |------|--------|
-| List / open rotations | `/kameti` |
-| One rotation (order, turns, per-person pay, Bill, Done) | `/kameti/[id]` |
+| List / open rotations (per-row copy of rotation summary) | `/kameti` |
+| One rotation (copy tables, order, turns, per-person pay, Bill, Done) | `/kameti/[id]` |
 | New rotation setup | `/kameti/new` |
 | List / edit / delete outings | `/outings` — **pencil** = edit, **trash** = delete (confirmation) |
 | Kameti treat bill for a turn | Kameti → **Bill** / **Edit bill** (new prefilled form or existing outing) |
 | American or generic outing | `/outings/new` |
 | Delete outing (edit screen) | `/outings/[id]` — sticky footer **Delete outing** (confirmation) |
 | Transaction history & transfers | `/transactions` (sidebar) — **History** tab; delete manual rows with trash icon |
-| Settlements (who pays whom) | `/settlements` |
+| Settlements (who pays whom; copy per scope) | `/settlements` |
 
 ## Limitations
 

@@ -35,17 +35,17 @@ export async function GET(request, { params }) {
     const outingIds = turnsRaw
       .map((t) => t.outingId)
       .filter(Boolean);
-    const outings = outingIds.length
-      ? await Outing.find({ _id: { $in: outingIds } })
-          .select("sharedBillPaisa parcels attendance")
-          .lean()
-      : [];
+    const outingQuery = outingIds.length
+      ? Outing.find({ _id: { $in: outingIds } }).select(
+          "sharedBillPaisa parcels attendance",
+        )
+      : null;
+    const outings = outingQuery ? await outingQuery.lean() : [];
     const outingById = new Map(
       outings.map((o) => [String(o._id), o]),
     );
-    const turns = turnsRaw.map((t) =>
-      enrichTurnWithBillStats(t, outingById),
-    );
+    const turns = turnsRaw.map((t) => enrichTurnWithBillStats(t, outingById));
+
     return jsonOk({ rotation, turns });
   } catch (err) {
     if (isInvalidParamError(err)) {
