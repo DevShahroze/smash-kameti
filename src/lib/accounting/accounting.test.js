@@ -19,6 +19,7 @@ import {
 } from "@/lib/accounting/balances";
 import { recommendTransfers } from "@/lib/accounting/settlement";
 import { TRANSACTION_TYPES } from "@/lib/constants";
+import { kametiHostSharedBillCreditPaisa } from "@/lib/accounting/outing-ledger";
 
 const m = (id, name) => ({
   kind: "member",
@@ -314,6 +315,32 @@ describe("balances and settlements", () => {
     expect(shared.reduce((s, a) => s + a.amountPaisa, 0)).toBe(
       paisaFromRupees(8000),
     );
+  });
+
+  it("kameti host shared bill credit excludes self-paid parcels", () => {
+    expect(
+      kametiHostSharedBillCreditPaisa(paisaFromRupees(22000), [
+        {
+          orderedBy: { kind: "member", refId: "h" },
+          paidBy: { kind: "member", refId: "h" },
+          amountPaisa: paisaFromRupees(1320),
+        },
+        {
+          orderedBy: { kind: "member", refId: "a" },
+          paidBy: { kind: "member", refId: "h" },
+          amountPaisa: paisaFromRupees(1320),
+        },
+      ]),
+    ).toBe(paisaFromRupees(20680));
+    expect(
+      kametiHostSharedBillCreditPaisa(paisaFromRupees(18500), [
+        {
+          orderedBy: { kind: "member", refId: "host" },
+          paidBy: { kind: "member", refId: "host" },
+          amountPaisa: paisaFromRupees(950),
+        },
+      ]),
+    ).toBe(paisaFromRupees(17550));
   });
 
   it("kameti settlement splits shared bill among members who pay share", () => {

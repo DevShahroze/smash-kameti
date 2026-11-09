@@ -23,6 +23,17 @@ function participantSnapshot(p) {
   };
 }
 
+/** Host settlement credit on Kameti nights: full check minus self-paid parcels (same as Kitty). */
+export function kametiHostSharedBillCreditPaisa(sharedBillPaisa, parcels = []) {
+  const selfPaid = (parcels || []).reduce((sum, p) => {
+    if (sameParticipantRef(p.orderedBy, p.paidBy)) {
+      return sum + (p.amountPaisa || 0);
+    }
+    return sum;
+  }, 0);
+  return Math.max(0, (sharedBillPaisa || 0) - selfPaid);
+}
+
 async function kametiRotationSettlementsIncluded(outing, session = null) {
   let turn = null;
   if (outing.kametiTurnId) {
@@ -110,6 +121,13 @@ export async function syncOutingFinancials(outing, session = null) {
     if (String(payment.appliesTo || "").startsWith("parcel:")) {
       continue;
     }
+    let amountPaisa = payment.amountPaisa;
+    if (outing.paymentSystem === PAYMENT_SYSTEMS.KAMETI) {
+      amountPaisa = kametiHostSharedBillCreditPaisa(
+        payment.amountPaisa,
+        outing.parcels || [],
+      );
+    }
     transactions.push({
       outingId,
       source: "outing_sync",
@@ -117,7 +135,7 @@ export async function syncOutingFinancials(outing, session = null) {
         outing.paymentSystem === PAYMENT_SYSTEMS.AMERICAN
           ? TRANSACTION_TYPES.AMERICAN_CONTRIBUTION
           : TRANSACTION_TYPES.RESTAURANT_BILL,
-      amountPaisa: payment.amountPaisa,
+      amountPaisa,
       payerKind: payment.paidBy.kind,
       payerId: payment.paidBy.refId,
       payerNameSnapshot: payment.paidBy.nameSnapshot,

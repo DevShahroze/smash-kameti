@@ -87,7 +87,7 @@ Multi-document sync (outing financial rebuild) supports MongoDB replica sets. On
 - **Parcels:** Always personal to the person who ordered. On **American** outings, the shared bill field is **only** the shared portion; parcels are **added** on top for what was spent. On **Kameti** outings, the bill field is the **full amount the host paid**, which **already includes** parcel amounts — parcels are listed separately for settlement only.
 - **Kameti turns:** Marked complete only via the Kameti page — not when an outing is completed. Turn stats store **total bill paid** and **Kameti split** (total − parcels).
 - **Self-paid parcel:** If **Ordered by** and **Paid by** are the same person, no parcel allocation or parcel payment is written (no paying yourself back).
-- **Kameti host + parcels:** The host is credited once for the **full total bill**. Extra parcel payment lines are **not** created when **Paid by** is the host (already inside the total).
+- **Kameti host + parcels:** Settlement credit for the host payment equals **total bill minus self-paid parcels** (same person ordered and paid) — personal items stay in the check but are not an extra “group advance.” Other members’ parcels still get separate settlement lines. Host **parcel** payment sync rows remain excluded from **Overall** so the check is not double-counted.
 - **Amounts:** Stored as integer paisa (1 PKR = 100 paisa).
 
 ## Kameti treat bill (how amounts work)
@@ -100,8 +100,11 @@ Multi-document sync (outing financial rebuild) supports MongoDB replica sets. On
 | **Outings list — Bill** | Kameti: total paid; American: shared + parcels |
 | **Outings list — Kameti split** | Kameti only: total − parcels; American outings show — |
 | **Paid by (settlement)** on parcels | Who advanced cash for that parcel; defaults to the **turn host** on new parcel rows |
+| **Host settlement credit** (ledger) | `total bill paid − self-paid parcels` — matches pooled kitty exports (treat row + parcel rows the host paid for others, not their own order) |
 
-Ledger sync: `buildKametiAllocations` splits **Kameti split** only; parcel rows use American-style personal allocations. Parcel settlement scope is **American** (and **Overall**), not the Kameti treat table. On the **Kameti** settlements scope, host **Shared bill** credits count **treat only** (total bill paid minus parcels), so treat rows and transfer suggestions stay in sync.
+Ledger sync: `buildKametiAllocations` splits **Kameti split** only; parcel rows use American-style personal allocations. Parcel settlement scope is **American** (and **Overall**), not the Kameti treat table. On the **Kameti** settlements scope, host **Shared bill** credits count **treat only** (total bill paid minus parcels), so treat rows and transfer suggestions stay in sync. On **Overall**, host **Shared bill** sync uses **host settlement credit** above (not always the raw total bill field).
+
+**Compare to a Kitty (or similar) export:** Use **Settlements → Overall** nets. **Participant balances** should match when the same bills and parcel lines are recorded. **How to settle up** lines may differ (many valid minimum-transfer paths). Kameti-only vs American tables are app-specific splits; Kitty is one combined pool like **Overall**.
 
 ### Worked example (8 members)
 
@@ -115,7 +118,7 @@ Ledger sync: `buildKametiAllocations` splits **Kameti split** only; parcel rows 
 | **Kameti split** | 18,500 − 3,670 = **Rs 14,830** |
 | **Per-person treat share** (8 people) | 14,830 ÷ 8 = **Rs 1,853.75** each |
 
-**Kameti settlement (the Rs 14,830):** Each of the 8 members is allocated **Rs 1,853.75** of treat share. Jamshed is credited **Rs 18,500** as the payer (one host payment).
+**Kameti settlement (the Rs 14,830):** Each of the 8 members is allocated **Rs 1,853.75** of treat share. Jamshed’s settlement credit is **Rs 17,550** (cash **Rs 18,500** minus **Rs 950** self-paid parcel — one host **Shared bill** sync row).
 
 **Parcel settlement (personal, American scope):**
 
@@ -136,7 +139,7 @@ No extra Rs 950 payment line for Jamshed’s own parcel — it is already inside
 | Hammad | 1,853.75 | 950 | 2,803.75 |
 | Saqib | 1,853.75 | 950 | 2,803.75 |
 | Each other member (×4) | 1,853.75 | — | 1,853.75 |
-| Jamshed | 1,853.75 (own share) | — | Host; paid 18,500 |
+| Jamshed | 1,853.75 (own share) | — | Host; **Rs 17,550** settlement credit |
 
 The **Settlements** page consolidates these into recommended member-to-member transfers.
 
@@ -155,7 +158,7 @@ Weeks 1 and 2 are unchanged. Each remaining payer’s **total treat debt** goes 
 
 **Why two settlement tables can show different line totals** (e.g. **Rs 38,331** vs **Rs 39,655**):
 
-- Underlying **treat math** for the group is the same; **host credits** (full bills paid) are unchanged.
+- Underlying **treat math** for the group is the same; **host settlement credits** on other weeks are unchanged.
 - Unchecking one person’s **Pays share** removes their treat slice on **that** bill and spreads it over everyone still checked.
 - Only members who are **net debtors** after host credits appear as **payers** in the table (often five people in an 8-person rotation). Each of those payers may owe **~Rs 265 more** per line → sum of lines rises by roughly **5 × 265 ≈ Rs 1,324** in a typical case.
 - **Payees change** too (greedy matcher): e.g. Mustafa might pay Hammad **and** Umar instead of a single line to Hammad, because **Umar is still a creditor** for **his own host week** — turning off Pays share on Jamshed’s bill does **not** remove Umar as host.
