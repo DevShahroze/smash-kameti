@@ -317,6 +317,72 @@ describe("balances and settlements", () => {
     );
   });
 
+  it("american ledger uses check minus parcels for shared split", () => {
+    const participants = [
+      m("hafeez", "Hafeez Hameed"),
+      m("hammad", "Hammad Ahmad"),
+      m("jamshed", "Jamshed Iqbal"),
+      m("mustafa", "Mustafa Haneef"),
+      m("shahroze", "Shahroze Ali"),
+      m("waqas", "Waqas Hameed"),
+    ];
+    const outingId = "o-american";
+    const parcelSum = paisaFromRupees(870);
+    const totalCheck = paisaFromRupees(9500);
+    const splitPaisa = totalCheck - parcelSum;
+    const allocations = buildAmericanAllocations({
+      outingId,
+      sharedBillPaisa: splitPaisa,
+      chargeableParticipants: participants.map((p) => ({
+        kind: "member",
+        refId: p.id,
+        nameSnapshot: p.name,
+      })),
+      parcels: [
+        {
+          _id: "p1",
+          orderedBy: { kind: "member", refId: "hafeez", nameSnapshot: "Hafeez Hameed" },
+          paidBy: { kind: "member", refId: "hafeez", nameSnapshot: "Hafeez Hameed" },
+          amountPaisa: parcelSum,
+        },
+      ],
+    });
+    const sharedSum = allocations
+      .filter((a) => a.allocationType === "american_shared")
+      .reduce((s, a) => s + a.amountPaisa, 0);
+    expect(sharedSum).toBe(splitPaisa);
+    const transactions = [
+      {
+        type: TRANSACTION_TYPES.AMERICAN_CONTRIBUTION,
+        amountPaisa: kametiHostSharedBillCreditPaisa(totalCheck, [
+          {
+            orderedBy: { kind: "member", refId: "hafeez" },
+            paidBy: { kind: "member", refId: "hafeez" },
+            amountPaisa: parcelSum,
+          },
+        ]),
+        payerKind: "member",
+        payerId: "hafeez",
+        payerNameSnapshot: "Hafeez Hameed",
+        affectsSettlement: true,
+        outingId,
+      },
+    ];
+    const settlementContext = {
+      outingPaymentById: new Map([[outingId, PAYMENT_SYSTEMS.AMERICAN]]),
+      settlementsIncludedByOutingId: new Map([[outingId, true]]),
+    };
+    const transfers = computeSettlementTransfers({
+      scope: SETTLEMENT_SCOPE.AMERICAN,
+      allocations,
+      transactions,
+      participants,
+      settlementContext,
+    });
+    expect(transfers.length).toBeGreaterThan(0);
+    expect(transfers.every((t) => t.toName === "Hafeez Hameed")).toBe(true);
+  });
+
   it("kameti host shared bill credit excludes self-paid parcels", () => {
     expect(
       kametiHostSharedBillCreditPaisa(paisaFromRupees(22000), [
@@ -561,6 +627,231 @@ describe("balances and settlements", () => {
         amountPaisa: paisaFromRupees(500),
       }),
     ]);
+  });
+
+  it("american settlements use greedy net balances", () => {
+    const participants = [
+      m("hamm", "Hammad"),
+      m("hafeez", "Hafeez"),
+      m("jam", "Jamshed"),
+    ];
+    const settlementContext = {
+      outingPaymentById: new Map([
+        ["o-a", PAYMENT_SYSTEMS.AMERICAN],
+        ["o-k", PAYMENT_SYSTEMS.KAMETI],
+      ]),
+      outingRotationByOutingId: new Map([["o-k", "rot"]]),
+      settlementsIncludedByRotationId: new Map([["rot", true]]),
+      settlementsIncludedByOutingId: new Map([
+        ["o-a", true],
+        ["o-k", true],
+      ]),
+      parcelsByOutingId: new Map([
+        [
+          "o-k",
+          [
+            {
+              _id: "p1",
+              amountPaisa: paisaFromRupees(950),
+              orderedBy: { kind: "member", refId: "hamm", nameSnapshot: "Hammad" },
+              paidBy: {
+                kind: "member",
+                refId: "jam",
+                nameSnapshot: "Jamshed",
+              },
+            },
+          ],
+        ],
+      ]),
+    };
+    const allocations = [
+      ...buildAmericanAllocations({
+        outingId: "o-a",
+        sharedBillPaisa: paisaFromRupees(3000),
+        chargeableParticipants: [
+          { kind: "member", refId: "hamm", nameSnapshot: "Hammad" },
+          { kind: "member", refId: "hafeez", nameSnapshot: "Hafeez" },
+          { kind: "member", refId: "jam", nameSnapshot: "Jamshed" },
+        ],
+      }),
+      ...buildKametiAllocations({
+        outingId: "o-k",
+        parcels: [
+          {
+            _id: "p1",
+            orderedBy: { kind: "member", refId: "hamm", nameSnapshot: "Hammad" },
+            amountPaisa: paisaFromRupees(950),
+          },
+        ],
+      }),
+    ];
+    const transactions = [
+      {
+        type: TRANSACTION_TYPES.AMERICAN_CONTRIBUTION,
+        amountPaisa: paisaFromRupees(3000),
+        payerKind: "member",
+        payerId: "hafeez",
+        payerNameSnapshot: "Hafeez",
+        affectsSettlement: true,
+        outingId: "o-a",
+      },
+      {
+        type: TRANSACTION_TYPES.RESTAURANT_BILL,
+        amountPaisa: paisaFromRupees(950),
+        payerKind: "member",
+        payerId: "jam",
+        payerNameSnapshot: "Jamshed",
+        affectsSettlement: true,
+        outingId: "o-k",
+        notes: "Parcel payment",
+      },
+    ];
+    const american = computeSettlementTransfers({
+      scope: SETTLEMENT_SCOPE.AMERICAN,
+      allocations,
+      transactions,
+      participants,
+      settlementContext,
+    });
+    const hammHafeez = american.find(
+      (t) => t.fromName === "Hammad" && t.toName === "Hafeez",
+    );
+    expect(hammHafeez?.amountPaisa).toBe(paisaFromRupees(1950));
+    expect(
+      american.reduce((s, t) => s + t.amountPaisa, 0),
+    ).toBe(paisaFromRupees(2000));
+  });
+
+  it("american directed lines sum to each debtor scoped balance", () => {
+    const participants = [
+      m("hafeez", "Hafeez Hameed"),
+      m("hammad", "Hammad Ahmad"),
+      m("jamshed", "Jamshed Iqbal"),
+      m("shahroze", "Shahroze Ali"),
+    ];
+    const outingId = "o-a";
+    const splitPaisa = paisaFromRupees(8630);
+    const settlementContext = {
+      outingPaymentById: new Map([
+        [outingId, PAYMENT_SYSTEMS.AMERICAN],
+        ["o-k", PAYMENT_SYSTEMS.KAMETI],
+      ]),
+      outingRotationByOutingId: new Map([["o-k", "rot"]]),
+      settlementsIncludedByRotationId: new Map([["rot", true]]),
+      settlementsIncludedByOutingId: new Map([
+        [outingId, true],
+        ["o-k", true],
+      ]),
+      parcelsByOutingId: new Map([
+        [
+          "o-k",
+          [
+            {
+              _id: "pk",
+              amountPaisa: paisaFromRupees(950),
+              orderedBy: { kind: "member", refId: "hammad", nameSnapshot: "Hammad Ahmad" },
+              paidBy: {
+                kind: "member",
+                refId: "hafeez",
+                nameSnapshot: "Hafeez Hameed",
+              },
+            },
+          ],
+        ],
+      ]),
+    };
+    const chargeable = [
+      { kind: "member", refId: "hafeez", nameSnapshot: "Hafeez Hameed" },
+      { kind: "member", refId: "hammad", nameSnapshot: "Hammad Ahmad" },
+      { kind: "member", refId: "jamshed", nameSnapshot: "Jamshed Iqbal" },
+      { kind: "member", refId: "shahroze", nameSnapshot: "Shahroze Ali" },
+    ];
+    const allocations = [
+      ...buildAmericanAllocations({
+        outingId,
+        sharedBillPaisa: splitPaisa,
+        chargeableParticipants: chargeable,
+      }),
+      ...buildKametiAllocations({
+        outingId: "o-k",
+        parcels: [
+          {
+            _id: "pk",
+            orderedBy: { kind: "member", refId: "hammad", nameSnapshot: "Hammad Ahmad" },
+            amountPaisa: paisaFromRupees(950),
+          },
+        ],
+      }),
+    ];
+    const transactions = [
+      {
+        type: TRANSACTION_TYPES.AMERICAN_CONTRIBUTION,
+        amountPaisa: paisaFromRupees(8630),
+        payerKind: "member",
+        payerId: "hafeez",
+        payerNameSnapshot: "Hafeez Hameed",
+        affectsSettlement: true,
+        outingId,
+      },
+      {
+        type: TRANSACTION_TYPES.RESTAURANT_BILL,
+        amountPaisa: paisaFromRupees(950),
+        payerKind: "member",
+        payerId: "hafeez",
+        payerNameSnapshot: "Hafeez Hameed",
+        affectsSettlement: true,
+        outingId: "o-k",
+        notes: "Parcel payment",
+      },
+    ];
+    const scopedAllocations = filterAllocationsForScope(
+      allocations,
+      SETTLEMENT_SCOPE.AMERICAN,
+      settlementContext,
+    );
+    const scopedTransactions = filterTransactionsForScope(
+      transactions,
+      SETTLEMENT_SCOPE.AMERICAN,
+      settlementContext,
+    );
+    const balanceMap = computeBalances({
+      allocations: scopedAllocations,
+      transactions: scopedTransactions,
+      participants,
+    });
+    const american = computeSettlementTransfers({
+      scope: SETTLEMENT_SCOPE.AMERICAN,
+      allocations,
+      transactions,
+      participants,
+      settlementContext,
+    });
+    for (const p of participants) {
+      const row = balanceMap[participantKey("member", p.id)];
+      if (!row || row.netBalancePaisa >= 0) {
+        continue;
+      }
+      const owed = -row.netBalancePaisa;
+      const out = american
+        .filter((t) => String(t.fromId) === String(p.id))
+        .reduce((s, t) => s + t.amountPaisa, 0);
+      expect(out).toBe(owed);
+    }
+    const hammHafeez = american.find(
+      (t) =>
+        t.fromName === "Hammad Ahmad" && t.toName === "Hafeez Hameed",
+    );
+    expect(hammHafeez).toBeTruthy();
+    expect(hammHafeez.amountPaisa).toBe(
+      allocations
+        .filter(
+          (a) =>
+            a.participantNameSnapshot === "Hammad Ahmad" &&
+            String(a.outingId) === outingId,
+        )
+        .reduce((s, a) => s + a.amountPaisa, 0) +
+        paisaFromRupees(950),
+    );
   });
 
   it("kameti host-paid parcel appears in american but not double-counted in overall", () => {

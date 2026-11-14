@@ -123,8 +123,8 @@ export const SettlementTransferTable = memo(function SettlementTransferTable({
     }
     onSettledChange({
       scope,
-      fromMemberId: confirmRow.fromId,
-      toMemberId: confirmRow.toId,
+      fromId: confirmRow.fromId,
+      toId: confirmRow.toId,
       amountPaisa: confirmRow.amountPaisa,
       settled: true,
     });
@@ -216,9 +216,9 @@ export const SettlementTransferTable = memo(function SettlementTransferTable({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={settlePending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={settlePending} onClick={confirmSettled}>
-              {settlePending ? "Saving…" : "Confirm settled"}
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSettled}>
+              Mark settled
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

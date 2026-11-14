@@ -33,8 +33,8 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { Money } from "@/components/money";
 import { PAYMENT_SYSTEMS } from "@/lib/constants";
 import {
+  americanSharedSplitPaisa,
   kametiSplitPaisa,
-  parcelTotalPaisa,
 } from "@/lib/services/kameti-bill-stats";
 import { format } from "date-fns";
 import { Pencil, Trash2 } from "lucide-react";
@@ -244,13 +244,7 @@ export default function OutingsPage() {
                       "text-right font-medium tabular-nums",
                     )}
                   >
-                    <Money
-                      paisa={
-                        o.paymentSystem === PAYMENT_SYSTEMS.KAMETI
-                          ? o.sharedBillPaisa || 0
-                          : (o.sharedBillPaisa || 0) + parcelTotalPaisa(o)
-                      }
-                    />
+                    <Money paisa={o.sharedBillPaisa || 0} />
                   </TableCell>
                   <TableCell
                     className={cn(
@@ -260,6 +254,8 @@ export default function OutingsPage() {
                   >
                     {o.paymentSystem === PAYMENT_SYSTEMS.KAMETI ? (
                       <Money paisa={kametiSplitPaisa(o)} />
+                    ) : o.paymentSystem === PAYMENT_SYSTEMS.AMERICAN ? (
+                      <Money paisa={americanSharedSplitPaisa(o)} />
                     ) : (
                       "—"
                     )}

@@ -16,7 +16,7 @@ export function ActivityLogControls({ className }) {
   const optIn = useSyncExternalStore(
     subscribeActivityLogs,
     getActivityLogOptIn,
-    () => true,
+    () => false,
   );
   const count = useSyncExternalStore(
     subscribeActivityLogs,

@@ -68,7 +68,8 @@ Multi-document sync (outing financial rebuild) supports MongoDB replica sets. On
 ## Settlements (Splitwise-style)
 
 - **Net balance (paisa):** `paid for group − your share + transfers in − transfers out`. Positive = should receive; negative = owes; zero = settled.
-- **American outings:** Shared bill split **equally** among **chargeable** members only (attendance alone does not create debt). Who paid the shared bill is tracked separately. Parcels are always the orderer’s personal share, never in the shared split.
+- **American outings:** Shared bill split **equally** among **chargeable** members only (attendance alone does not create debt). The form field is the **full check**; the split uses the check minus all parcel line amounts (same idea as Kameti treat split). Who paid the check is tracked separately. Parcels are the orderer’s personal share, never counted again inside the split.
+- **American settlements table:** Same as Kitty-style **suggested settlements**: greedy matching on **American scope net balances** (American shared bills + personal Kameti parcels). One payment line per payer→receiver pair; amounts are exact paisa (e.g. 8630 ÷ 6 ≈ **Rs 1,438.33**). **Kameti** scope is treat-only; **Overall** includes everything plus transfers.
 - **Kameti settlement:** The **group treat** only — **total bill paid minus all parcel amounts**, split equally among members with **Pays share of bill** checked on the Kameti outing form. Attendance (present/absent) is for records; **Pays share** (default on) controls who is in that split (absent members can still pay if left checked).
 - **American settlement:** American outings **plus** personal **parcels on Kameti nights** (who ordered owes who paid). Kameti shared treat is **not** duplicated here.
 - **Overall settlement:** Both scopes plus recorded member transfers (Settlements page — Overall table is read-only).
@@ -84,7 +85,7 @@ Multi-document sync (outing financial rebuild) supports MongoDB replica sets. On
 
 - **Expense-based mode (default):** Only American outings, parcels, manual transfers, and adjustments affect settlement balances. Kameti shared bills are recorded for history but do **not** create group liabilities.
 - **Combined mode:** Kameti host shared bills also allocate to the host for settlement (enable in Settings, then re-save completed Kameti outings if needed).
-- **Parcels:** Always personal to the person who ordered. On **American** outings, the shared bill field is **only** the shared portion; parcels are **added** on top for what was spent. On **Kameti** outings, the bill field is the **full amount the host paid**, which **already includes** parcel amounts — parcels are listed separately for settlement only.
+- **Parcels:** Always personal to the person who ordered. On **American** and **Kameti** outings, the bill field is the **full check** (parcels listed below are **within** that total, not added on top). The **shared split** is `total check − sum(parcel lines)`. Settlement credit for the payer is `total check − self-paid parcels`.
 - **Kameti turns:** Marked complete only via the Kameti page — not when an outing is completed. Turn stats store **total bill paid** and **Kameti split** (total − parcels).
 - **Self-paid parcel:** If **Ordered by** and **Paid by** are the same person, no parcel allocation or parcel payment is written (no paying yourself back).
 - **Kameti host + parcels:** Settlement credit for the host payment equals **total bill minus self-paid parcels** (same person ordered and paid) — personal items stay in the check but are not an extra “group advance.” Other members’ parcels still get separate settlement lines. Host **parcel** payment sync rows remain excluded from **Overall** so the check is not double-counted.

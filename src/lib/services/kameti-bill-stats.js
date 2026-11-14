@@ -8,6 +8,13 @@ export function parcelTotalPaisa(outing) {
   );
 }
 
+/** American: sharedBillPaisa is the full check (parcel lines are within it, not on top). */
+export function americanSharedSplitPaisa(outing) {
+  const totalBillPaisa = outing?.sharedBillPaisa || 0;
+  const parcelSum = parcelTotalPaisa(outing);
+  return Math.max(0, totalBillPaisa - parcelSum);
+}
+
 /** Kameti: sharedBillPaisa is the full amount the host paid (parcels included). */
 export function kametiSplitPaisa(outing) {
   const totalBillPaisa = outing?.sharedBillPaisa || 0;
@@ -81,6 +88,8 @@ export function enrichTurnWithBillStats(turn, outingById) {
       perMemberPay,
       payersCount,
       treatSharePerMemberPaisa,
+      /** View-only on Kameti rotation page (host self-paid parcel line). */
+      outingParcels: outing.parcels || [],
     };
   }
   const treat = turn.treatAmountPaisa || 0;

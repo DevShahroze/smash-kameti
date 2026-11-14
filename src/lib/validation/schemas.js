@@ -12,6 +12,7 @@ export const memberSchema = z.object({
   fullName: z.string().min(1).max(120),
   nickname: z.string().max(60).optional().default(""),
   contact: z.string().max(120).optional().default(""),
+  bankAccountInfo: z.string().max(1000).optional().default(""),
   active: z.boolean().optional().default(true),
   kametiTurnNumber: z.number().int().positive().nullable().optional(),
 });

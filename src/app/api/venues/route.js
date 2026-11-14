@@ -6,22 +6,49 @@ import Outing from "@/models/Outing";
 import { OUTING_STATUS } from "@/lib/constants";
 import { requireAdminApi } from "@/lib/auth/require-admin-api";
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function findVenueWithSameName(name, excludeId = null) {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const query = {
+    name: new RegExp(`^${escapeRegex(trimmed)}$`, "i"),
+  };
+  if (excludeId) {
+    query._id = { $ne: excludeId };
+  }
+  return Venue.findOne(query).lean();
+}
+
 export async function GET() {
   try {
     await connectDB();
     const venues = await Venue.find().sort({ name: 1 }).lean();
-    const stats = await Outing.aggregate([
-      { $match: { status: OUTING_STATUS.COMPLETED, venueId: { $ne: null } } },
-      {
-        $group: {
-          _id: "$venueId",
-          visitCount: { $sum: 1 },
-          totalBill: { $sum: "$sharedBillPaisa" },
-          highest: { $max: "$sharedBillPaisa" },
-          lowest: { $min: "$sharedBillPaisa" },
+    const [stats, linked] = await Promise.all([
+      Outing.aggregate([
+        { $match: { status: OUTING_STATUS.COMPLETED, venueId: { $ne: null } } },
+        {
+          $group: {
+            _id: "$venueId",
+            visitCount: { $sum: 1 },
+            totalBill: { $sum: "$sharedBillPaisa" },
+            highest: { $max: "$sharedBillPaisa" },
+            lowest: { $min: "$sharedBillPaisa" },
+          },
         },
-      },
+      ]),
+      Outing.aggregate([
+        { $match: { venueId: { $ne: null } } },
+        { $group: { _id: "$venueId", linkedOutingCount: { $sum: 1 } } },
+      ]),
     ]);
+    const linkedMap = Object.fromEntries(
+      linked.map((s) => [String(s._id), s.linkedOutingCount]),
+    );
     const statMap = Object.fromEntries(
       stats.map((s) => [
         String(s._id),
@@ -35,15 +62,21 @@ export async function GET() {
         },
       ]),
     );
-    const enriched = venues.map((v) => ({
-      ...v,
-      stats: statMap[String(v._id)] || {
-        visitCount: 0,
-        averageBillPaisa: 0,
-        highestBillPaisa: 0,
-        lowestBillPaisa: 0,
-      },
-    }));
+    const enriched = venues.map((v) => {
+      const id = String(v._id);
+      return {
+        ...v,
+        stats: {
+          ...(statMap[id] || {
+            visitCount: 0,
+            averageBillPaisa: 0,
+            highestBillPaisa: 0,
+            lowestBillPaisa: 0,
+          }),
+          linkedOutingCount: linkedMap[id] || 0,
+        },
+      };
+    });
     return jsonOk(enriched);
   } catch (err) {
     console.error(err);
@@ -62,6 +95,9 @@ export async function POST(request) {
     const parsed = venueSchema.safeParse(body);
     if (!parsed.success) {
       return jsonError("Validation failed", 400, parsed.error.flatten());
+    }
+    if (await findVenueWithSameName(parsed.data.name)) {
+      return jsonError("A venue with this name already exists", 409);
     }
     const venue = await Venue.create(parsed.data);
     return jsonOk(venue, 201);

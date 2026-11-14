@@ -198,5 +198,9 @@ export function computeSettlementTransfers({
     (b) => b.kind === PARTICIPANT_KIND.MEMBER,
   );
 
+  if (scope === SETTLEMENT_SCOPE.AMERICAN) {
+    return recommendTransfers(memberRows);
+  }
+
   return recommendTransfers(memberRows);
 }

@@ -23,8 +23,8 @@ function participantSnapshot(p) {
   };
 }
 
-/** Host settlement credit on Kameti nights: full check minus self-paid parcels (same as Kitty). */
-export function kametiHostSharedBillCreditPaisa(sharedBillPaisa, parcels = []) {
+/** Settlement credit for who paid the check: total minus self-paid parcel lines. */
+export function sharedBillSettlementCreditPaisa(sharedBillPaisa, parcels = []) {
   const selfPaid = (parcels || []).reduce((sum, p) => {
     if (sameParticipantRef(p.orderedBy, p.paidBy)) {
       return sum + (p.amountPaisa || 0);
@@ -33,6 +33,9 @@ export function kametiHostSharedBillCreditPaisa(sharedBillPaisa, parcels = []) {
   }, 0);
   return Math.max(0, (sharedBillPaisa || 0) - selfPaid);
 }
+
+/** @deprecated alias */
+export const kametiHostSharedBillCreditPaisa = sharedBillSettlementCreditPaisa;
 
 async function kametiRotationSettlementsIncluded(outing, session = null) {
   let turn = null;
@@ -100,9 +103,17 @@ export async function syncOutingFinancials(outing, session = null) {
   const transactions = [];
 
   if (outing.paymentSystem === PAYMENT_SYSTEMS.AMERICAN) {
+    const parcelSum = (outing.parcels || []).reduce(
+      (sum, p) => sum + (p.amountPaisa || 0),
+      0,
+    );
+    const sharedSplitPaisa = Math.max(
+      0,
+      (outing.sharedBillPaisa || 0) - parcelSum,
+    );
     const built = buildAmericanAllocations({
       outingId,
-      sharedBillPaisa: outing.sharedBillPaisa,
+      sharedBillPaisa: sharedSplitPaisa,
       chargeableParticipants: outing.chargeableParticipants,
       parcels: outing.parcels || [],
     });
@@ -122,8 +133,11 @@ export async function syncOutingFinancials(outing, session = null) {
       continue;
     }
     let amountPaisa = payment.amountPaisa;
-    if (outing.paymentSystem === PAYMENT_SYSTEMS.KAMETI) {
-      amountPaisa = kametiHostSharedBillCreditPaisa(
+    if (
+      outing.paymentSystem === PAYMENT_SYSTEMS.KAMETI ||
+      outing.paymentSystem === PAYMENT_SYSTEMS.AMERICAN
+    ) {
+      amountPaisa = sharedBillSettlementCreditPaisa(
         payment.amountPaisa,
         outing.parcels || [],
       );

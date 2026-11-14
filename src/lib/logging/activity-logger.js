@@ -1,4 +1,4 @@
-/** Admin activity logs: fresh on each full page load; persisted in localStorage until refresh (guests do not log). */
+/** Admin activity logs: opt-in off by default; log buffer cleared on refresh/close (guests do not log). */
 
 const STORAGE_KEY = "sk_activity_logs";
 const OPT_IN_KEY = "sk_activity_log_opt_in";
@@ -7,7 +7,7 @@ const MAX_ENTRIES = 1500;
 const logs = [];
 const listeners = new Set();
 let loggingEnabled = false;
-let userOptIn = true;
+let userOptIn = false;
 
 let currentViewId = crypto.randomUUID();
 let pageEnteredAt = performance.now();
@@ -21,16 +21,16 @@ function canUseStorage() {
 
 function readOptInFromStorage() {
   if (!canUseStorage()) {
-    return true;
+    return false;
   }
   try {
     const value = localStorage.getItem(OPT_IN_KEY);
     if (value === null) {
-      return true;
+      return false;
     }
     return value === "1" || value === "true";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -282,4 +282,11 @@ export function downloadActivityLogs() {
   a.download = `smash-kameti-activity-${stamp}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+if (canUseStorage()) {
+  clearStoredLogs();
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", clearStoredLogs);
+  }
 }

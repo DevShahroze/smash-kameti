@@ -79,7 +79,7 @@ export default function SettlementsPage() {
       <SettlementTransferTable
         scope="american"
         title="American settlement"
-        description="American shared bills (chargeable members only) and personal parcels."
+        description="Suggested payments from American outing splits plus Kameti parcel debts (Kitty-style minimum transfers)."
         transfers={americanTransfers}
         showSettledCheckbox={isAdmin}
         onSettledChange={

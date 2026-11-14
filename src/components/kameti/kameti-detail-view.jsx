@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
 import {
@@ -27,8 +28,51 @@ import { SettlementsSummary } from "@/components/settlements/settlements-summary
 import { AdminOnly } from "@/components/auth/admin-only";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Money } from "@/components/money";
-import { formatPKR } from "@/lib/money";
+import { formatPKR, sameParticipantRef } from "@/lib/money";
 import { CopyTableButton } from "@/components/kameti/copy-table-button";
+
+/** Completed-turn table only: show host’s own (self-paid) parcel; settlements unchanged. */
+function perMemberPayRowsForDisplay(rows, { memberId, memberNameSnapshot, outingParcels }) {
+  if (!memberId || !outingParcels?.length) {
+    return rows;
+  }
+  const hostId = String(memberId);
+  const selfPaidPaisa = outingParcels
+    .filter(
+      (p) =>
+        sameParticipantRef(p.orderedBy, p.paidBy) &&
+        String(p.orderedBy?.refId) === hostId,
+    )
+    .reduce((sum, p) => sum + (p.amountPaisa || 0), 0);
+  if (selfPaidPaisa <= 0) {
+    return rows;
+  }
+  const existing = rows.find((r) => String(r.memberId) === hostId);
+  if (!existing) {
+    const parcelPaisa = selfPaidPaisa;
+    return [
+      ...rows,
+      {
+        memberId: hostId,
+        name: memberNameSnapshot || "Host",
+        treatSharePaisa: 0,
+        parcelPaisa,
+        totalPayPaisa: parcelPaisa,
+      },
+    ].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return rows.map((r) => {
+    if (String(r.memberId) !== hostId) {
+      return r;
+    }
+    const parcelPaisa = r.parcelPaisa + selfPaidPaisa;
+    return {
+      ...r,
+      parcelPaisa,
+      totalPayPaisa: r.treatSharePaisa + parcelPaisa,
+    };
+  });
+}
 
 function KametiPerMemberPay({
   rows,
@@ -329,9 +373,19 @@ export function KametiDetailView({ rotationId }) {
                 {isAdmin ? (
                   <Link
                     href={kametiBillPath(pending[0])}
-                    className={cn(buttonVariants({ size: "sm" }))}
+                    className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                    title={
+                      pending[0].outingId
+                        ? "Edit bill"
+                        : "Add bill for this turn"
+                    }
+                    aria-label={
+                      pending[0].outingId
+                        ? "Edit bill"
+                        : "Add bill for this turn"
+                    }
                   >
-                    {pending[0].outingId ? "Edit bill" : "Add bill for this turn"}
+                    <Pencil />
                   </Link>
                 ) : pending[0].outingId ? (
                   <Link
@@ -447,17 +501,21 @@ export function KametiDetailView({ rotationId }) {
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         {isAdmin ? (
-                          <span className="space-x-1">
+                          <span className="inline-flex items-center gap-0.5">
                             <Link
                               href={kametiBillPath(t)}
                               className={cn(
                                 buttonVariants({
-                                  size: "xs",
-                                  variant: "outline",
+                                  size: "icon-sm",
+                                  variant: "ghost",
                                 }),
                               )}
+                              title={t.outingId ? "Edit bill" : "Add bill"}
+                              aria-label={
+                                t.outingId ? "Edit bill" : "Add bill"
+                              }
                             >
-                              {t.outingId ? "Edit bill" : "Bill"}
+                              <Pencil className="size-3.5" />
                             </Link>
                             {t.status === "pending" ? (
                               <Button
@@ -515,7 +573,11 @@ export function KametiDetailView({ rotationId }) {
                         Week {t.turnNumber} — {t.memberNameSnapshot}
                       </p>
                       <KametiPerMemberPay
-                        rows={t.perMemberPay}
+                        rows={perMemberPayRowsForDisplay(t.perMemberPay, {
+                          memberId: t.memberId,
+                          memberNameSnapshot: t.memberNameSnapshot,
+                          outingParcels: t.outingParcels,
+                        })}
                         payersCount={t.payersCount}
                         treatSharePerMemberPaisa={t.treatSharePerMemberPaisa}
                         copyLabel={`Copy week ${t.turnNumber} per-person table`}

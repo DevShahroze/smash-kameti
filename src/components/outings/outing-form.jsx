@@ -34,6 +34,7 @@ import { Money } from "@/components/money";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 import {
   AmericanOutingFields,
   AmericanGuestPaysShare,
@@ -144,6 +145,7 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     () => prefill?.hostMemberId || "",
   );
   const [guestPickerKey, setGuestPickerKey] = useState(0);
+  const [newGuestName, setNewGuestName] = useState("");
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -397,10 +399,9 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     (s, p) => s + (p.amount ? paisaFromRupees(p.amount) : 0),
     0,
   );
-  const kametiSplitPaisa = Math.max(0, sharedBillPaisa - parcelTotalPaisa);
-  const grandTotalPaisa = isKametiOuting
-    ? sharedBillPaisa
-    : sharedBillPaisa + parcelTotalPaisa;
+  const sharedSplitPaisa = Math.max(0, sharedBillPaisa - parcelTotalPaisa);
+  const kametiSplitPaisa = sharedSplitPaisa;
+  const grandTotalPaisa = sharedBillPaisa;
 
   const chargeableList = useMemo(() => {
     const list = [];
@@ -501,17 +502,36 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     };
   }
 
+  function americanSelfPaidParcelPaisa() {
+    return parcels.reduce((sum, parcel) => {
+      const amountPaisa = parcel.amount ? paisaFromRupees(parcel.amount) : 0;
+      if (
+        amountPaisa <= 0 ||
+        !parcel.orderedById ||
+        !parcel.paidById ||
+        parcel.orderedById !== parcel.paidById
+      ) {
+        return sum;
+      }
+      return sum + amountPaisa;
+    }, 0);
+  }
+
   function buildAmericanPayments() {
     const payments = [];
     if (sharedBillPaisa > 0 && payerMemberId) {
       const payer = activeMembers.find((m) => m._id === payerMemberId);
+      const creditPaisa = Math.max(
+        0,
+        sharedBillPaisa - americanSelfPaidParcelPaisa(),
+      );
       payments.push({
         paidBy: {
           kind: "member",
           refId: payerMemberId,
           nameSnapshot: memberLabel(payer),
         },
-        amountPaisa: sharedBillPaisa,
+        amountPaisa: creditPaisa,
         appliesTo: "shared",
       });
     }
@@ -628,9 +648,11 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
     mutation.mutate(payload);
   }
 
-  function addGuestFromList(guestId) {
-    const guest = guests.find((g) => g._id === guestId);
-    if (!guest) {
+  function appendOutingGuest(guest) {
+    if (
+      outingGuests.some((g) => g.guestId && String(g.guestId) === String(guest._id))
+    ) {
+      toast.error("Guest is already on this outing");
       return;
     }
     setOutingGuests((prev) => [
@@ -643,6 +665,32 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
       },
     ]);
   }
+
+  function addGuestFromList(guestId) {
+    const guest = guests.find((g) => g._id === guestId);
+    if (!guest) {
+      return;
+    }
+    appendOutingGuest(guest);
+  }
+
+  const createGuestMutation = useMutation({
+    mutationFn: (name) =>
+      apiFetch("/api/guests", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim() }),
+      }),
+    onSuccess: (created) => {
+      queryClient.setQueryData(queryKeys.guests, (old = []) => [
+        ...old,
+        created,
+      ]);
+      appendOutingGuest(created);
+      setNewGuestName("");
+      toast.success("Guest added");
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   function defaultKametiParcelPayer() {
     if (!isKametiOuting || !hostMemberId) {
@@ -849,20 +897,52 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
                 ))}
               </div>
             )}
-            <div className="flex flex-wrap gap-2">
-              <OptionSelect
-                key={guestPickerKey}
-                onValueChange={(guestId) => {
-                  if (!guestId) {
-                    return;
-                  }
-                  addGuestFromList(guestId);
-                  setGuestPickerKey((k) => k + 1);
-                }}
-                options={guestPickerOptions}
-                placeholder="Add guest"
-                triggerClassName="h-8 w-48 text-xs"
-              />
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Guest on outing</Label>
+                <OptionSelect
+                  key={guestPickerKey}
+                  onValueChange={(guestId) => {
+                    if (!guestId) {
+                      return;
+                    }
+                    addGuestFromList(guestId);
+                    setGuestPickerKey((k) => k + 1);
+                  }}
+                  options={guestPickerOptions}
+                  placeholder="Pick existing guest"
+                  triggerClassName="h-8 w-48 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">New guest</Label>
+                <div className="flex gap-1">
+                  <Input
+                    className="h-8 w-40 text-xs"
+                    placeholder="Name"
+                    value={newGuestName}
+                    onChange={(e) => setNewGuestName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newGuestName.trim()) {
+                        e.preventDefault();
+                        createGuestMutation.mutate(newGuestName);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={
+                      !newGuestName.trim() || createGuestMutation.isPending
+                    }
+                    onClick={() => createGuestMutation.mutate(newGuestName)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
             {outingGuests.map((g, idx) => (
@@ -905,7 +985,7 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
               <Label className="text-xs">
                 {isKametiOuting
                   ? "Total bill paid (PKR)"
-                  : "Shared restaurant bill (PKR)"}
+                  : "Total check at restaurant (PKR)"}
               </Label>
               <Input
                 className="h-8 max-w-xs"
@@ -1033,13 +1113,14 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
                     <Button
                       type="button"
                       variant="ghost"
-                      size="xs"
-                      className="shrink-0"
+                      size="icon-sm"
+                      className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Remove parcel line"
                       onClick={() =>
                         setParcels((prev) => prev.filter((_, i) => i !== idx))
                       }
                     >
-                      Remove
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 </div>
@@ -1063,9 +1144,9 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
                 </>
               ) : (
                 <>
-                  Shared: <Money paisa={sharedBillPaisa} /> · Parcels:{" "}
-                  <Money paisa={parcelTotalPaisa} /> · Total:{" "}
-                  <Money paisa={grandTotalPaisa} />
+                  Total check: <Money paisa={sharedBillPaisa} /> · Parcels
+                  (within check): <Money paisa={parcelTotalPaisa} /> · Shared
+                  split: <Money paisa={sharedSplitPaisa} />
                 </>
               )}
             </p>
@@ -1082,13 +1163,15 @@ export function OutingForm({ initialOuting = null, prefill = null }) {
                 render={
                   <Button
                     type="button"
-                    variant="destructive"
-                    size="sm"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    aria-label="Delete outing"
                     disabled={deleteMutation.isPending || mutation.isPending}
                   />
                 }
               >
-                Delete outing
+                <Trash2 />
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>

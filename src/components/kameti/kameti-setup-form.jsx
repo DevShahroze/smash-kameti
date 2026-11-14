@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { paisaFromRupees } from "@/lib/money";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Trash2 } from "lucide-react";
 import { MemberMultiCombobox } from "@/components/kameti/member-multi-combobox";
 
 function memberLabel(m) {
@@ -275,7 +275,7 @@ export function KametiSetupForm() {
                 aria-label="Remove from rotation"
                 onClick={() => removeFromOrder(m._id)}
               >
-                <X className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </li>
           ))}

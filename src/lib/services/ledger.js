@@ -67,7 +67,7 @@ export async function resyncOutingsForKametiRotation(rotationId) {
   }
 }
 
-async function buildSettlementContext() {
+export async function buildSettlementContext() {
   const [outings, turns, rotations] = await Promise.all([
     Outing.find()
       .select(
@@ -134,6 +134,10 @@ async function buildSettlementContext() {
     );
   }
 
+  const parcelsByOutingId = new Map(
+    outings.map((o) => [String(o._id), o.parcels || []]),
+  );
+
   return {
     outingPaymentById,
     outingRotationByOutingId,
@@ -141,6 +145,7 @@ async function buildSettlementContext() {
     settlementsIncludedByOutingId,
     outingHostByOutingId,
     kametiTreatPaisaByOutingId,
+    parcelsByOutingId,
   };
 }
 
