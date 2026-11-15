@@ -16,6 +16,10 @@ const inter = Inter({
 export const metadata = {
   title: "Smash Kameti Tracker",
   description: "Kameti turns, American splits, and group settlements",
+  icons: {
+    icon: [{ url: "/favicon.ico" }, { url: "/brand/smash-kameti-64.png", sizes: "64x64", type: "image/png" }],
+    apple: "/brand/smash-kameti-256.png",
+  },
 };
 
 export default async function RootLayout({ children }) {

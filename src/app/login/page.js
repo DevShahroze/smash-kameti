@@ -10,6 +10,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { AppLogo } from "@/components/brand/app-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,7 +41,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-5 shadow-sm">
-        <div className="space-y-1">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <AppLogo size="lg" />
           <h1 className="text-lg font-medium">Admin login</h1>
           <p className="text-xs text-muted-foreground">
             Use your admin email and password (stored hashed in MongoDB).

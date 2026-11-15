@@ -11,6 +11,7 @@ import { AdminOnly } from "@/components/auth/admin-only";
 import { ActivityLogControls } from "@/components/logging/activity-log-controls";
 import { ConnectionStatus } from "@/components/layout/connection-status";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { AppLogo } from "@/components/brand/app-logo";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -76,9 +77,14 @@ export const TopNavbar = memo(function TopNavbar({
             <Menu className="h-4 w-4" />
           </SheetTrigger>
           <SheetContent side="left" className="flex w-44 flex-col p-0">
-            <div className="border-b px-3 py-2.5 text-sm font-medium">
-              Smash Kameti
-            </div>
+            <Link
+              href="/"
+              className="flex items-center gap-2 border-b px-3 py-2.5"
+              onClick={closeMobileMenu}
+            >
+              <AppLogo size="sm" />
+              <span className="text-sm font-medium">Smash Kameti</span>
+            </Link>
             <div className="flex-1 overflow-y-auto">
               <Suspense fallback={null}>
                 <SidebarNav onNavigate={closeMobileMenu} />
@@ -92,9 +98,10 @@ export const TopNavbar = memo(function TopNavbar({
 
         <Link
           href="/"
-          className="shrink-0 text-sm font-medium hover:text-foreground/90"
+          className="flex shrink-0 items-center gap-2 hover:opacity-90"
         >
-          Smash Kameti
+          <AppLogo size="sm" priority />
+          <span className="text-sm font-medium">Smash Kameti</span>
         </Link>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { AppShell } from "@/components/layout/app-shell";
+import { AppBootstrapSplash } from "@/components/layout/app-bootstrap-splash";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { QueryPrefetch } from "@/components/providers/query-prefetch";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -15,7 +16,9 @@ export default async function MainLayout({ children }) {
     <QueryProvider>
       <AuthProvider role={role}>
         <QueryPrefetch />
-        <AppShell role={role}>{children}</AppShell>
+        <AppBootstrapSplash>
+          <AppShell role={role}>{children}</AppShell>
+        </AppBootstrapSplash>
         <Toaster richColors position="top-right" />
       </AuthProvider>
     </QueryProvider>

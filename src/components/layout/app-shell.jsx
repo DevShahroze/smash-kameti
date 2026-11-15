@@ -10,6 +10,7 @@ import { TopNavbar, SidebarNav } from "@/components/layout/top-navbar";
 import { ROLES } from "@/lib/auth/session";
 import { apiFetch } from "@/lib/api/client";
 import { ActivityNavigationLogger } from "@/components/logging/activity-navigation-logger";
+import { AppLogo } from "@/components/brand/app-logo";
 
 const AuthFooter = memo(function AuthFooter({ isGuest }) {
   if (!isGuest) {
@@ -52,12 +53,18 @@ export const AppShell = memo(function AppShell({ children, role }) {
       />
       <div className="flex min-h-0 flex-1 md:flex-row">
         <aside className="hidden w-44 shrink-0 border-r md:flex md:flex-col">
-          <div className="border-b px-3 py-2.5">
-            <p className="text-sm font-medium">Menu</p>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              {isGuest ? "Guest" : "Admin"}
-            </p>
-          </div>
+          <Link
+            href="/"
+            className="flex items-center gap-2 border-b px-3 py-2.5 hover:opacity-90"
+          >
+            <AppLogo size="sm" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">Smash Kameti</p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {isGuest ? "Guest" : "Admin"}
+              </p>
+            </div>
+          </Link>
           <div className="flex-1 overflow-y-auto">
             <Suspense fallback={null}>
               <SidebarNav />
